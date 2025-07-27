@@ -41,8 +41,10 @@ RUN pnpm install --prod --frozen-lockfile
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/generated ./generated
+
+# Generate Prisma client in production stage
+RUN pnpm prisma generate
 
 # Copy entrypoint script
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
