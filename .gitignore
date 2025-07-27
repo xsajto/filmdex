@@ -123,8 +123,8 @@ Thumbs.db
 
 # Crawler specific
 storage/
-*.json
 exports/
+cache/**/*.json
 
 # Test files
 test-results/
