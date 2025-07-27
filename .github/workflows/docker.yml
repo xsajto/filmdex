@@ -40,7 +40,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ steps.date.outputs.date }}
-            ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY_URL }}/tonda/${{ env.IMAGE_NAME }}:${{ steps.date.outputs.date }}
+            ${{ env.REGISTRY_URL }}/tonda/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
