@@ -840,7 +840,7 @@ export class DatabaseService extends BaseDatabaseService {
                     language: { connect: { id: languageId } }
                 },
                 update: {
-                    value: translationInput.value,
+                    translated_value: translationInput.translated_value,
                     updated_at: new Date()
                 }
             });
