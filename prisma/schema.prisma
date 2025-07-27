@@ -1,0 +1,678 @@
+// ===================================================================
+// Refactored Movies Crawler Database Schema - Cleaned Up Version
+// ===================================================================
+// 
+// Reduced from 27 tables to 15 tables by consolidating related entities:
+// 1. Gallery + Image + Video → Media (unified media table)
+// 2. Network + ProductionCompany → Organization 
+// 3. KeywordAssociation → Polymorphic for all many-to-many relationships
+// 4. PersonAlternativeName + Translation → Translation (polymorphic)
+//
+// Author: Movies Crawler Team
+// Last Updated: 2025-01-23
+// ===================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===================================================================
+// Content Model - Core Entity (Movies, TV Shows, Seasons, Episodes)
+// ===================================================================
+model Content {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String
+  remoteSource        String   // 'csfd', 'tmdb', 'imdb', etc.
+  title               String
+  originalTitle       String?
+  
+  // Content type and hierarchy
+  type                String   // 'movie', 'series', 'season', 'episode'
+  parent              Content? @relation("ContentHierarchy", fields: [parentId], references: [id])
+  parentId            Int?
+  children            Content[] @relation("ContentHierarchy")
+  
+  // Universal metadata
+  year                Int?
+  releaseDate         DateTime?
+  duration            Int?     // minutes
+  description         String?
+  tagline             String?
+  
+  // Ratings and popularity
+  rating              Float?   // Normalized 0-10 scale
+  originalRating      String?  // Original rating as string
+  voteCount           Int?
+  popularity          Float?
+  
+  // Status and financial
+  status              String?
+  budget              Int?
+  revenue             Int?
+  
+  // Series/Season specific
+  episodeCount        Int?
+  seasonCount         Int?
+  seasonNumber        Int?
+  episodeNumber       Int?
+  
+  // Source information
+  sourceUrl           String
+  sourceMetadata      String?  // JSON field for source-specific data
+  
+  // Relationships
+  cast                Cast[]
+  media               Media[]
+  reviews             Review[]
+  
+  // Many-to-many relationships via junction tables
+  collections         Collection[] @relation("CollectionContent")
+  organizations       ContentOrganization[]
+  genres              ContentGenre[]
+  countries           ContentCountry[]
+  languages           ContentLanguage[]
+  
+  // Content relations (recommendations, similar content)
+  sourceRelations     ContentRelations[] @relation("SourceContentRelations")
+  targetRelations     ContentRelations[] @relation("TargetContentRelations")
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  lastCrawledAt       DateTime?
+  
+  @@unique([remoteId, remoteSource])
+  @@index([type])
+  @@index([year])
+  @@index([rating])
+  @@index([remoteSource])
+  @@index([remoteSource, type])
+  @@index([type, year, rating])
+  @@index([remoteSource, lastCrawledAt])
+}
+
+// ===================================================================
+// Person Model - Individual People Details
+// ===================================================================
+model Person {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String
+  remoteSource        String
+  
+  // Basic information
+  name                String
+  biography           String?
+  
+  // Life dates and location
+  birthDate           DateTime?
+  deathDate           DateTime?
+  birthPlace          String?
+  
+  // Physical and career attributes
+  gender              String?
+  profileUrl          String?
+  knownForDepartment  String?
+  popularity          Float?
+  
+  // Source information
+  sourceMetadata      String?
+  sourceUrl           String
+  
+  // Relationships
+  cast                Cast[]
+  media               Media[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  lastCrawledAt       DateTime?
+  
+  @@unique([remoteId, remoteSource])
+  @@index([name])
+  @@index([knownForDepartment])
+  @@index([popularity])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Cast Model - Content-Person Relationships
+// ===================================================================
+model Cast {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  person              Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId            Int
+  
+  // Role-specific information
+  role                String   // 'Actor', 'Director', 'Writer', 'Producer', etc.
+  character           String?  // For actors
+  department          String?  // 'Acting', 'Directing', 'Writing', etc.
+  order               Int?     // Billing/credit order
+  episodeCount        Int?     // For TV series
+  
+  // Source tracking
+  remoteSource        String
+  sourceMetadata      String?
+  sourceUrl           String?
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([contentId, personId, role, character])
+  @@index([role])
+  @@index([department])
+  @@index([order])
+  @@index([remoteSource])
+  @@index([personId])
+  @@index([contentId, role])
+}
+
+// ===================================================================
+// Media Model - Unified Media Storage (Images, Videos, Audio)
+// ===================================================================
+model Media {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?
+  remoteSource        String
+  
+  // Media information
+  type                String   // 'image', 'video', 'audio'
+  subtype             String?  // 'poster', 'backdrop', 'trailer', 'clip', etc.
+  title               String?
+  description         String?
+  url                 String
+  
+  // Media properties
+  width               Int?
+  height              Int?
+  aspectRatio         Float?
+  duration            Int?     // For videos/audio (seconds)
+  size                Int?     // File size or resolution
+  language            String?
+  
+  // Quality and ratings
+  voteAverage         Float?
+  voteCount           Int?
+  isPrimary           Boolean  @default(false)
+  
+  // Video-specific fields
+  site                String?  // 'YouTube', 'Vimeo', etc.
+  key                 String?  // video key/ID on the site
+  publishedAt         DateTime?
+  
+  // Source information
+  sourceMetadata      String?
+  sourceUrl           String
+  
+  // Polymorphic relationships - can belong to Content OR Person
+  content             Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int?
+  person              Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId            Int?
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([type])
+  @@index([subtype])
+  @@index([remoteSource])
+  @@index([contentId])
+  @@index([personId])
+  @@index([contentId, type, subtype])
+  @@index([personId, type])
+}
+
+// ===================================================================
+// Organization Model - Networks, Studios, Production Companies
+// ===================================================================
+model Organization {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?
+  remoteSource        String
+  
+  // Organization information
+  name                String
+  type                String   // 'network', 'production_company', 'distributor', etc.
+  logoPath            String?
+  originCountry       String?
+  description         String?
+  headquarters        String?
+  
+  // Source information
+  sourceMetadata      String?
+  sourceUrl           String?
+  
+  // Relationships
+  content             ContentOrganization[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([name, type, remoteSource])
+  @@index([type])
+  @@index([remoteSource])
+  @@index([originCountry])
+}
+
+// ===================================================================
+// Translation Model - ONLY for actual language translations
+// ===================================================================
+model Translation {
+  id                  Int      @id @default(autoincrement())
+  
+  // Polymorphic entity reference (Laravel style)
+  translatable_type   String   // 'Content', 'Person'
+  translatable_id     Int      // References the ID of the entity
+  
+  // What field is being translated
+  field_name          String   // 'title', 'overview', 'tagline', 'biography', 'name'
+  
+  // Language reference (FK to Language table)
+  language            Language @relation(fields: [language_id], references: [id])
+  language_id         Int
+  country_code        String?  // Optional for regional variants (e.g., 'en-US' vs 'en-GB')
+  
+  // Translation content
+  translated_value    String   // The actual translated text
+  original_value      String?  // Original text for comparison
+  
+  // Source tracking
+  remote_source       String
+  source_metadata     String?  // JSON metadata from source
+  
+  // Metadata
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  
+  @@unique([translatable_type, translatable_id, field_name, language_id, country_code])
+  @@index([translatable_type, translatable_id])
+  @@index([language_id])
+  @@index([field_name])
+  @@index([remote_source])
+}
+
+// ===================================================================
+// Clean Metadata Table for Non-Translation Data
+// ===================================================================
+model Metadata {
+  id                  Int      @id @default(autoincrement())
+  
+  // Polymorphic entity reference (Laravel style)
+  metadatable_type    String   // 'Content', 'Person', 'Organization'
+  metadatable_id      Int      // References the ID of the entity
+  
+  // Clear metadata type classification
+  type                String   // 'alternative_title', 'content_rating', 'release_date', 'certification'
+  subtype             String?  // 'theatrical', 'digital', 'working_title', 'official_rating'
+  
+  // Clean value storage
+  value               String   // Main value (title, rating, date as ISO string, etc.)
+  numeric_value       Float?   // For numeric data
+  date_value          DateTime? // For actual dates
+  
+  // Geographic context
+  country_code        String?  // ISO 3166-1 alpha-2
+  
+  // Source tracking
+  remote_source       String   // 'tmdb', 'csfd'
+  remote_id           String?  // ID from remote source
+  source_data         String?  // Original JSON data
+  
+  // Metadata
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  
+  @@unique([metadatable_type, metadatable_id, type, subtype, country_code])
+  @@index([metadatable_type, metadatable_id])
+  @@index([type])
+  @@index([subtype])
+  @@index([country_code])
+  @@index([remote_source])
+}
+
+// ===================================================================
+// KeywordAssociation Model - Polymorphic Keyword Relationships
+// ===================================================================
+model KeywordAssociation {
+  id                  Int      @id @default(autoincrement())
+  
+  // Keyword relationship
+  keyword             Keyword  @relation(fields: [keywordSlug], references: [slug], onDelete: Cascade)
+  keywordSlug         String
+  
+  // Polymorphic entity reference
+  entityType          String   // 'content', 'person', 'collection', 'organization'
+  entityId            Int      // References the ID of the entity
+  
+  // Source tracking
+  remoteSource        String
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  @@unique([keywordSlug, entityType, entityId])
+  @@index([keywordSlug])
+  @@index([entityType, entityId])
+  @@index([entityType])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Keyword Model - Universal Entity Tagging
+// ===================================================================
+model Keyword {
+  slug                String   @id  // URL-friendly slug
+  name                String   // Display name
+  remoteId            String?
+  remoteSource        String?
+  
+  // Relationships
+  associations        KeywordAssociation[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([name])
+}
+
+// ===================================================================
+// ExternalId Model - Universal External IDs
+// ===================================================================
+model ExternalId {
+  id              Int      @id @default(autoincrement())
+  
+  // External ID information
+  source          String   // 'imdb', 'tmdb', 'csfd', 'wikidata', etc.
+  externalId      String   // The actual ID from external source
+  
+  // Polymorphic entity reference
+  entityType      String   // 'content', 'person', 'collection', 'organization'
+  entityId        Int      // References the ID of the entity
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([source, externalId, entityType, entityId])
+  @@index([source])
+  @@index([externalId])
+  @@index([entityType, entityId])
+  @@index([entityType])
+}
+
+// ===================================================================
+// Junction Tables for Many-to-Many Relationships
+// ===================================================================
+
+// Content-Organization junction
+model ContentOrganization {
+  id                  Int          @id @default(autoincrement())
+  
+  content             Content      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId      Int
+  
+  role                String?      // 'production', 'distribution', 'network', etc.
+  remoteSource        String
+  
+  createdAt           DateTime     @default(now())
+  
+  @@unique([contentId, organizationId, role])
+  @@index([contentId])
+  @@index([organizationId])
+  @@index([role])
+  @@index([remoteSource])
+}
+
+// Content-Genre junction
+model ContentGenre {
+  id                  Int      @id @default(autoincrement())
+  
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  genre               Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  genreId             Int
+  
+  remoteSource        String
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, genreId])
+  @@index([contentId])
+  @@index([genreId])
+  @@index([remoteSource])
+}
+
+// Content-Country junction
+model ContentCountry {
+  id                  Int      @id @default(autoincrement())
+  
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  country             Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  countryId           Int
+  
+  role                String   @default("production") // 'production', 'origin', 'release'
+  remoteSource        String
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, countryId, role])
+  @@index([contentId])
+  @@index([countryId])
+  @@index([role])
+  @@index([remoteSource])
+}
+
+// Content-Language junction  
+model ContentLanguage {
+  id                  Int      @id @default(autoincrement())
+  
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  language            Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  languageId          Int
+  
+  role                String   @default("spoken") // 'spoken', 'subtitle', 'dubbing', 'original'
+  remoteSource        String
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, languageId, role])
+  @@index([contentId])
+  @@index([languageId])
+  @@index([role])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Metadata Tables (Keep Simple)
+// ===================================================================
+
+model Genre {
+  id                  Int      @id @default(autoincrement())
+  slug                String   @unique
+  name                String   @unique
+  remoteId            String?
+  remoteSource        String?
+  
+  content             ContentGenre[]
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([slug])
+  @@index([name])
+}
+
+model Country {
+  id                  Int      @id @default(autoincrement())
+  code                String   @unique // ISO 3166-1 alpha-2
+  name                String   @unique
+  
+  content             ContentCountry[]
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([code])
+  @@index([name])
+}
+
+model Language {
+  id                  Int      @id @default(autoincrement())
+  code                String   @unique // ISO 639-1
+  name                String   @unique
+  nativeName          String?
+  
+  // Relationships
+  content             ContentLanguage[]
+  translations        Translation[]      // New relationship for actual translations
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([code])
+  @@index([name])
+}
+
+// ===================================================================
+// Other Content-Related Tables
+// ===================================================================
+
+model Collection {
+  id                  Int      @id @default(autoincrement())
+  
+  remoteId            String?
+  remoteSource        String
+  name                String
+  description         String?
+  sourceMetadata      String?
+  sourceUrl           String?
+  
+  content             Content[] @relation("CollectionContent")
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([name, remoteSource])
+  @@index([remoteSource])
+}
+
+
+model Review {
+  id                  Int      @id @default(autoincrement())
+  
+  remoteId            String?
+  remoteSource        String
+  author              String
+  rating              Float?
+  title               String?
+  content             String?
+  language            String?
+  publishedAt         DateTime?
+  sourceMetadata      String?
+  sourceUrl           String
+  detailUrl           String   @unique
+  
+  contentItem         Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([rating])
+  @@index([publishedAt])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Content Relations Table
+// ===================================================================
+
+model ContentRelations {
+  id                  Int      @id @default(autoincrement())
+  
+  // Source content that has the relation
+  sourceContent       Content  @relation("SourceContentRelations", fields: [sourceContentId], references: [id], onDelete: Cascade)
+  sourceContentId     Int
+  
+  // Target content that is related
+  targetContent       Content  @relation("TargetContentRelations", fields: [targetContentId], references: [id], onDelete: Cascade)
+  targetContentId     Int
+  
+  // Type of relation
+  type                String   // 'recommendation', 'similar'
+  
+  // Source tracking
+  remoteSource        String   // 'tmdb', 'csfd'
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([sourceContentId, targetContentId, type, remoteSource])
+  @@index([sourceContentId, type])
+  @@index([targetContentId, type])
+  @@index([type])
+  @@index([remoteSource])
+}
+
+
+// ===================================================================
+// System Tables
+// ===================================================================
+
+model RequestQueue {
+  id                      String        @id @default(cuid())
+  queueName               String
+  url                     String
+  method                  String        @default("GET")
+  headers                 String?
+  payload                 String?
+  userData                String?
+  metadata                String?
+  uniqueKey               String?
+  priority                Float         @default(0.5)
+  status                  RequestStatus @default(PENDING)
+  retryCount              Int           @default(0)
+  maxRetries              Int           @default(3)
+  lastError               String?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  processingStartedAt     DateTime?
+  processingCompletedAt   DateTime?
+  
+  @@unique([queueName, uniqueKey])
+  @@index([queueName, status])
+  @@index([queueName, priority, createdAt])
+  @@index([status])
+  @@index([processingStartedAt])
+}
+
+enum RequestStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  RETRYING
+}

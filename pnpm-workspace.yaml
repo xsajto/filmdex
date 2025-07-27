@@ -1,0 +1,17 @@
+packages:
+  - .
+  - ../crawler
+  - ../crawler/packages/*
+
+ignoredBuiltDependencies:
+  - better-sqlite3
+  - puppeteer
+  - sqlite3
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - nx
+  - prisma
+  - unrs-resolver

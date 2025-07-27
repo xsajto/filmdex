@@ -1,0 +1,1227 @@
+// ===================================================================
+// Universal Movies Crawler Database Schema
+// ===================================================================
+// 
+// This schema is designed for a universal movie/TV content crawler that
+// can aggregate data from multiple sources (TMDB, CSFD, IMDb, etc.)
+// 
+// Key Design Principles:
+// - Universal structure supporting movies, TV shows, seasons, episodes
+// - Source-agnostic with explicit source tracking
+// - Hierarchical content relationships (series → seasons → episodes)
+// - Embedded person data in Cast (no separate Person table)
+// - Polymorphic keywords for flexible entity associations
+// - Comprehensive external ID mapping
+// - Proper relational tables instead of JSON arrays
+// - Flexible metadata storage for source-specific data
+// 
+// Author: Movies Crawler Team
+// Last Updated: 2025-01-17
+// ===================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===================================================================
+// Content Model - Core Entity
+// ===================================================================
+// 
+// The central model representing all types of content including:
+// - Movies (standalone films)
+// - TV Series (shows with multiple seasons)
+// - Seasons (collections of episodes within a series)
+// - Episodes (individual episodes within a season)
+// 
+// This model uses a hierarchical structure where:
+// - Series can have multiple Seasons (parent → children)
+// - Seasons can have multiple Episodes (parent → children)
+// - Movies are standalone (no parent/children relationships)
+// 
+// Each content item has a unique combination of remoteId + remoteSource
+// to prevent duplicates when crawling the same content from multiple sources.
+// ===================================================================
+model Content {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification - ONLY content has remoteId/remoteSource
+  remoteId            String
+  remoteSource        String   // 'csfd', 'tmdb', 'imdb', etc.
+  title               String
+  originalTitle       String?
+  
+  // Content type and hierarchy
+  type                String   // 'movie', 'series', 'season', 'episode'
+  parent              Content? @relation("ContentHierarchy", fields: [parentId], references: [id])
+  parentId            Int?
+  children            Content[] @relation("ContentHierarchy")
+  
+  // Universal metadata
+  year                Int?
+  releaseDate         DateTime?
+  duration            Int?     // minutes
+  description         String?
+  tagline             String?
+  
+  // Ratings and popularity
+  rating              Float?   // Normalized 0-10 scale
+  originalRating      String?  // Original rating as string (e.g., "8.5/10", "85%")
+  voteCount           Int?
+  popularity          Float?
+  
+  // Content classification - now using relational tables
+  // genres, countries, and languages moved to separate association tables
+  
+  // Status and financial (where applicable)
+  status              String?  // 'Released', 'In Production', 'Aired', 'Cancelled', etc.
+  budget              Int?
+  revenue             Int?
+  
+  // Series/Season specific
+  episodeCount        Int?     // for seasons
+  seasonCount         Int?     // for series
+  seasonNumber        Int?     // for seasons
+  episodeNumber       Int?     // for episodes
+  
+  // Network/Studio information - now using relational tables
+  // studios and distributors moved to separate association tables
+  
+  // Source information
+  sourceUrl           String   // URL to original source
+  
+  // Source-specific metadata (JSON for flexibility)
+  sourceMetadata      String?  // JSON field for source-specific data
+  
+  // Relationships (External IDs handled via polymorphic ExternalId table)
+  trivia              Trivia[]
+  cast                Cast[]
+  videos              Video[]
+  galleries           Gallery[]
+  awards              Award[]
+  soundtracks         Soundtrack[]
+  reviews             Review[]
+  collections         Collection[] @relation("CollectionContent")
+  translations        Translation[]
+  networks            ContentNetwork[]
+  productionCompanies ContentProductionCompany[]
+  genres              ContentGenre[]
+  countries           ContentCountry[]
+  languages           ContentLanguage[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  lastCrawledAt       DateTime?
+  
+  @@unique([remoteId, remoteSource])
+  @@index([type])
+  @@index([year])
+  @@index([rating])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Person Model - Individual People Details
+// ===================================================================
+// 
+// Stores detailed information about people (actors, directors, writers, etc.)
+// This is a separate table to avoid data duplication when the same person
+// appears in multiple movies/shows with different roles.
+// 
+// Each person has a unique combination of remoteId + remoteSource to prevent
+// duplicates when the same person is found across different sources.
+// 
+// Person data includes:
+// - Basic info (name, biography, birth/death dates, place of birth)
+// - Physical attributes (gender, profile image)
+// - Career information (known for department)
+// - External IDs for cross-referencing across sources
+// ===================================================================
+model Person {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String
+  remoteSource        String   // 'tmdb', 'csfd', 'imdb', etc.
+  
+  // Basic information
+  name                String
+  originalName        String?
+  biography           String?
+  
+  // Life dates and location
+  birthDate           DateTime?
+  deathDate           DateTime?
+  birthPlace          String?
+  
+  // Physical and career attributes
+  gender              String?   // 'male', 'female', 'other'
+  profileUrl          String?   // Profile image URL
+  knownForDepartment  String?   // 'Acting', 'Directing', 'Writing', etc.
+  popularity          Float?    // Popularity score from source
+  
+  // Alternative names moved to separate table
+  
+  // Source-specific metadata
+  sourceMetadata      String?   // JSON field for source-specific data
+  sourceUrl           String    // URL to person's page on source
+  
+  // Relationships (External IDs handled via polymorphic ExternalId table)
+  images              Image[]
+  cast                Cast[]
+  alternativeNames    PersonAlternativeName[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  lastCrawledAt       DateTime?
+  
+  @@unique([remoteId, remoteSource])
+  @@index([name])
+  @@index([knownForDepartment])
+  @@index([popularity])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Cast Model - Content-Person Relationships
+// ===================================================================
+// 
+// Junction table connecting Content to Person with role-specific information.
+// This allows the same person to have multiple roles in the same content
+// (e.g., actor + director) and tracks role-specific details like character names.
+// 
+// Cast entries include:
+// - Role information (actor, director, writer, producer, etc.)
+// - Character name (for actors)
+// - Department and order/billing information
+// - Episode count (for TV series)
+// ===================================================================
+model Cast {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  person              Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId            Int
+  
+  // Role-specific information
+  role                String   // 'Actor', 'Director', 'Writer', 'Producer', etc.
+  character           String?  // For actors - character name they play
+  department          String?  // 'Acting', 'Directing', 'Writing', 'Production', etc.
+  
+  // Cast metadata
+  order               Int?     // Billing/credit order
+  episodeCount        Int?     // For TV series - number of episodes this person appears in
+  
+  // Source tracking
+  remoteSource        String   // Source that provided this cast relationship
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field for source-specific cast data
+  sourceUrl           String?  // URL to cast info on source
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([contentId, personId, role, character])
+  @@index([role])
+  @@index([department])
+  @@index([order])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Content External IDs Model - Cross-Source Content Referencing
+// ===================================================================
+// 
+// Stores external identifiers for content (movies, TV shows, etc.)
+// from different sources to enable cross-referencing and data deduplication.
+// 
+// Common external ID sources for content:
+// - IMDb (Internet Movie Database) - e.g., "tt0137523"
+// - TMDB (The Movie Database) - e.g., "550"
+// - CSFD (Česko-Slovenská filmová databáze) - e.g., "1707"
+// - Wikidata - e.g., "Q190050"
+// - Facebook, Instagram, Twitter pages
+// 
+// This enables linking the same content across different sources
+// and prevents duplicate entries in the database.
+// ===================================================================
+
+// ===================================================================
+// Person External IDs Model - Cross-Source Person Referencing
+// ===================================================================
+// 
+// Stores external identifiers for people (actors, directors, etc.)
+// from different sources to enable cross-referencing and data deduplication.
+// 
+// Common external ID sources for people:
+// - IMDb (Internet Movie Database) - e.g., "nm0000093"
+// - TMDB (The Movie Database) - e.g., "287"
+// - CSFD (Česko-Slovenská filmová databáze) - e.g., "1234"
+// - Wikidata - e.g., "Q81328"
+// - Facebook, Instagram, Twitter profiles
+// 
+// This enables linking the same person across different sources
+// and prevents duplicate entries in the database.
+// ===================================================================
+
+// ===================================================================
+// Collection External IDs Model - Cross-Source Collection Referencing
+// ===================================================================
+// 
+// Stores external identifiers for collections (movie franchises, series)
+// from different sources to enable cross-referencing and data deduplication.
+// 
+// Common external ID sources for collections:
+// - IMDb (Internet Movie Database) - collection/franchise IDs
+// - TMDB (The Movie Database) - e.g., "10" for Star Wars Collection
+// - CSFD (Česko-Slovenská filmová databáze) - series IDs
+// - Wikidata - e.g., "Q462" for Star Wars franchise
+// 
+// This enables linking the same collection across different sources
+// and prevents duplicate entries in the database.
+// ===================================================================
+
+// ===================================================================
+// Keywords Model - Universal Entity Tagging
+// ===================================================================
+// 
+// Stores keywords/tags that can be associated with any entity type using 
+// a polymorphic approach for maximum flexibility and normalization.
+// 
+// Design decisions:
+// - Uses slug as primary key (e.g., "action-thriller", "time-travel")
+// - No auto-increment ID to avoid duplication across sources
+// - Optional remoteId/remoteSource tracking for source-specific keywords
+// - Polymorphic associations via KeywordAssociation table
+// 
+// Keywords are normalized during import:
+// - "Action Movies" → "action-movies" (slug)
+// - "Time Travel" → "time-travel" (slug)
+// - "Sci-Fi" → "sci-fi" (slug)
+// 
+// Supported entity types:
+// - Content (movies, TV shows, seasons, episodes)
+// - Person (actors, directors, etc.)
+// - Collection (movie franchises)
+// - Network (TV networks, streaming platforms)
+// - ProductionCompany (studios, distributors)
+// 
+// This approach allows the same keyword from different sources
+// to be automatically merged and associated with any entity type.
+// ===================================================================
+model Keyword {
+  slug                String   @id  // URL-friendly slug like "action-movies"
+  name                String   // Display name like "Action Movies"
+  remoteId            String?  // External ID from source (nullable)
+  remoteSource        String?  // Source: "tmdb", "csfd", etc. (nullable)
+  
+  // Relationships - now uses polymorphic KeywordAssociation
+  associations        KeywordAssociation[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([name])
+}
+
+// ===================================================================
+// Keyword Association Model - Polymorphic Keyword Relationships
+// ===================================================================
+// 
+// Uses polymorphic pattern to associate keywords with any entity type:
+// - Content (movies, TV shows, seasons, episodes)
+// - Person (actors, directors, etc.)
+// - Collection (movie franchises)
+// - Network (TV networks, streaming platforms)
+// - ProductionCompany (studios, distributors)
+// 
+// This replaces multiple junction tables with a single unified approach.
+// ===================================================================
+model KeywordAssociation {
+  id                  Int      @id @default(autoincrement())
+  
+  // Keyword relationship
+  keyword             Keyword  @relation(fields: [keywordSlug], references: [slug], onDelete: Cascade)
+  keywordSlug         String
+  
+  // Polymorphic entity reference (handled at application level)
+  entityType          String   // 'content', 'person', 'collection', 'network', 'company'
+  entityId            Int      // References the ID of the entity
+  
+  // Source tracking
+  remoteSource        String   // Source that provided this keyword association
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  // Constraints and indexes
+  @@unique([keywordSlug, entityType, entityId])
+  @@index([keywordSlug])
+  @@index([entityType, entityId])
+  @@index([entityType])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Trivia Model - Fun Facts and Behind-the-Scenes Information
+// ===================================================================
+// 
+// Stores interesting facts, trivia, and behind-the-scenes information
+// about content such as:
+// - Production trivia ("The movie was filmed in 3 months")
+// - Actor trivia ("Brad Pitt broke his arm during filming")
+// - Director trivia ("Christopher Nolan used practical effects")
+// - General facts ("Based on a true story")
+// 
+// Each trivia item is unique per content (text + contentId) to prevent
+// duplicate facts from being stored.
+// ===================================================================
+model Trivia {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Trivia ID from source
+  remoteSource        String
+  
+  // Trivia content
+  text                String
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  
+  // Source information
+  sourceUrl           String
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([text, contentId])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Videos Model - Trailers, Clips, and Media Content
+// ===================================================================
+// 
+// Stores video content associated with movies/TV shows including:
+// - Trailers (official trailers, teasers)
+// - Behind-the-scenes content
+// - Interviews and featurettes
+// - Clips and scenes
+// 
+// Videos are typically hosted on external platforms like YouTube, Vimeo
+// and are referenced by URL. The detailUrl field is unique to prevent
+// duplicate videos from being stored.
+// 
+// Common video types: 'trailer', 'teaser', 'clip', 'behind_the_scenes',
+// 'interview', 'featurette', 'bloopers'
+// ===================================================================
+model Video {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Video ID from source
+  remoteSource        String
+  
+  // Basic information
+  title               String?
+  description         String?
+  url                 String
+  detailUrl           String   @unique
+  
+  // Video properties
+  type                String?  // 'trailer', 'clip', 'teaser', 'behind_the_scenes', etc.
+  site                String?  // 'YouTube', 'Vimeo', etc.
+  key                 String?  // video key/ID on the site
+  size                Int?     // resolution
+  language            String?
+  
+  // Metadata
+  publishedAt         DateTime?
+  duration            Int?     // seconds
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  
+  // Source information
+  sourceUrl           String
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([type])
+  @@index([site])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Gallery Model - Image Collections
+// ===================================================================
+// 
+// Organizes images into logical collections/galleries for each content item.
+// 
+// Common gallery types:
+// - 'posters' - Official movie posters and artwork
+// - 'backdrops' - Background images and wallpapers
+// - 'stills' - Scene screenshots and promotional images
+// - 'promotional' - Marketing and press images
+// - 'behind_the_scenes' - Production photos
+// 
+// Each gallery belongs to a specific content item and contains
+// multiple images organized by type.
+// ===================================================================
+model Gallery {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Gallery ID from source
+  remoteSource        String
+  
+  // Basic information
+  type                String?  // 'backdrops', 'posters', 'stills', 'promotional', etc.
+  name                String?
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  images              Image[]
+  
+  // Source information
+  sourceUrl           String
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([type])
+  @@index([remoteSource])
+}
+
+// Universal Images
+model Image {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Image ID from source
+  remoteSource        String
+  
+  // Basic information
+  url                 String
+  width               Int?
+  height              Int?
+  aspectRatio         Float?
+  
+  // Metadata
+  language            String?
+  voteAverage         Float?
+  voteCount           Int?
+  imageType           String?  // 'profile', 'headshot', 'still', etc.
+  isPrimary           Boolean  @default(false) // Is this the primary/main image for the person/gallery?
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships - either linked to gallery (content) OR person (1:N)
+  gallery             Gallery? @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  galleryId           Int?
+  person              Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId            Int?
+  
+  // Source information
+  sourceUrl           String
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([remoteSource])
+}
+
+// Universal Awards and nominations
+model Award {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Award ID from source
+  remoteSource        String
+  
+  // Award information
+  name                String
+  category            String?
+  year                Int?
+  result              String?  // 'won', 'nominated', 'shortlisted'
+  
+  // Additional details
+  description         String?
+  organization        String?
+  detailUrl           String?
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  
+  // Source information
+  sourceUrl           String
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([name, category, year, contentId])
+  @@index([year])
+  @@index([result])
+  @@index([remoteSource])
+}
+
+// Universal Soundtracks and music
+model Soundtrack {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Track ID from source
+  remoteSource        String
+  
+  // Track information
+  title               String
+  artist              String?
+  composer            String?
+  duration            Int?     // seconds
+  trackNumber         Int?
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  
+  // Source information
+  sourceUrl           String
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([title, artist, contentId])
+  @@index([artist])
+  @@index([composer])
+  @@index([remoteSource])
+}
+
+// Universal Reviews
+model Review {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Review ID from source
+  remoteSource        String
+  
+  // Review information
+  author              String
+  rating              Float?
+  title               String?
+  content             String?
+  
+  // Metadata
+  language            String?
+  publishedAt         DateTime?
+  
+  // Source-specific metadatae
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships
+  contentItem         Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  
+  // Source information
+  sourceUrl           String
+  detailUrl           String   @unique
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([rating])
+  @@index([publishedAt])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Collections Model - Movie Franchises and Series
+// ===================================================================
+// 
+// Represents collections of related content such as:
+// - Movie franchises (e.g., "Marvel Cinematic Universe", "Star Wars")
+// - Film series (e.g., "The Matrix Trilogy", "Lord of the Rings")
+// - Thematic collections (e.g., "Best Picture Winners")
+// 
+// Collections have many-to-many relationships with Content, allowing
+// a single movie to belong to multiple collections and a collection
+// to contain multiple movies.
+// 
+// Each collection is unique per source (name + remoteSource) to prevent
+// duplicates when the same collection is found across multiple sources.
+// ===================================================================
+model Collection {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Collection ID from source
+  remoteSource        String
+  
+  // Collection information
+  name                String
+  description         String?
+  
+  // External IDs handled via polymorphic ExternalId table
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field
+  
+  // Relationships
+  content             Content[] @relation("CollectionContent")
+  
+  // Source information
+  sourceUrl           String?
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([name, remoteSource])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Request Queue Model - Crawler Task Management
+// ===================================================================
+// 
+// Manages the crawling queue for all crawler sources, providing:
+// - Request queuing and deduplication
+// - Priority-based processing
+// - Retry logic with exponential backoff
+// - Distributed locking for concurrent processing
+// - Error handling and logging
+// 
+// This allows multiple crawler instances to work from the same queue
+// without conflicts or duplicate processing.
+// 
+// Queue processing states:
+// - handled: false (pending processing)
+// - handled: true (successfully processed)
+// - retryCount > 0 (failed but retrying)
+// - retryCount >= maxRetries (permanently failed)
+
+// ===================================================================
+// Translation and Alternative Names Model
+// ===================================================================
+// 
+// Stores translated titles, alternative names, and localized metadata
+// for content across different languages and regions.
+// 
+// This model supports:
+// - Translated titles (e.g., "Fight Club" → "El Club de la Lucha")
+// - Alternative titles (e.g., "Matrix Reloaded" → "The Matrix: Reloaded")
+// - Region-specific names (e.g., "Harry Potter" → "Harry Potter à l'école des sorciers")
+// - Localized descriptions, taglines, and overviews
+// 
+// Language codes follow ISO 639-1 standard (e.g., 'en', 'es', 'fr')
+// Country codes follow ISO 3166-1 alpha-2 standard (e.g., 'US', 'ES', 'FR')
+// ===================================================================
+model Translation {
+  id                  Int      @id @default(autoincrement())
+  
+  // Source identification
+  remoteId            String?  // Translation ID from source
+  remoteSource        String   // Source that provided this translation
+  
+  // Language and region information
+  languageCode        String   // ISO 639-1 language code (e.g., 'en', 'es', 'fr')
+  countryCode         String?  // ISO 3166-1 alpha-2 country code (e.g., 'US', 'ES', 'FR')
+  
+  // Translated content
+  title               String?  // Translated title
+  originalTitle       String?  // Original title in this language
+  overview            String?  // Translated description/overview
+  tagline             String?  // Translated tagline
+  homepage            String?  // Localized homepage URL
+  
+  // Alternative names and titles moved to separate table
+  
+  // Translation metadata
+  type                String   @default("translation") // 'translation', 'alternative_title', 'original_title'
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field for source-specific translation data
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  
+  // Source information
+  sourceUrl           String?  // URL to translation source
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Indexes for efficient querying
+  @@unique([contentId, languageCode, countryCode, title])
+  @@index([languageCode])
+  @@index([countryCode])
+  @@index([type])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Network Model - TV Networks and Streaming Platforms
+// ===================================================================
+// 
+// Represents TV networks, streaming platforms, and broadcasters that
+// air or distribute content (e.g., HBO, Netflix, BBC, Disney+)
+// ===================================================================
+model Network {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Network ID from source
+  remoteSource        String
+  
+  // Network information
+  name                String
+  logoPath            String?  // URL to network logo
+  originCountry       String?  // Country code (e.g., 'US', 'UK')
+  
+  // External IDs handled via polymorphic ExternalId table
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field for source-specific network data
+  
+  // Relationships
+  content             ContentNetwork[]
+  
+  // Source information
+  sourceUrl           String?
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([name, remoteSource])
+  @@index([remoteSource])
+  @@index([originCountry])
+}
+
+// ===================================================================
+// NetworkExternalId Model - External IDs for Networks
+// ===================================================================
+
+// ===================================================================
+// ContentNetwork Model - Many-to-Many Content to Network
+// ===================================================================
+model ContentNetwork {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  network             Network  @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  networkId           Int
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, networkId])
+  @@index([contentId])
+  @@index([networkId])
+}
+
+// ===================================================================
+// ProductionCompany Model - Production Companies and Studios
+// ===================================================================
+// 
+// Represents production companies, studios, and distributors that
+// produce or distribute content (e.g., Warner Bros., Disney, Universal)
+// ===================================================================
+model ProductionCompany {
+  id                  Int      @id @default(autoincrement())
+  
+  // Universal identification
+  remoteId            String?  // Company ID from source
+  remoteSource        String
+  
+  // Company information
+  name                String
+  logoPath            String?  // URL to company logo
+  originCountry       String?  // Country code (e.g., 'US', 'UK')
+  description         String?  // Company description
+  headquarters        String?  // Company headquarters location
+  
+  // External IDs handled via polymorphic ExternalId table
+  
+  // Source-specific metadata
+  sourceMetadata      String?  // JSON field for source-specific company data
+  
+  // Relationships
+  content             ContentProductionCompany[]
+  
+  // Source information
+  sourceUrl           String?
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([name, remoteSource])
+  @@index([remoteSource])
+  @@index([originCountry])
+}
+
+// ===================================================================
+// ProductionCompanyExternalId Model - External IDs for Companies
+// ===================================================================
+
+// ===================================================================
+// ContentProductionCompany Model - Many-to-Many Content to Company
+// ===================================================================
+model ContentProductionCompany {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  company             ProductionCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId           Int
+  
+  // Production role (optional)
+  role                String?  // 'production', 'distribution', 'financing', etc.
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, companyId])
+  @@index([contentId])
+  @@index([companyId])
+  @@index([role])
+}
+
+// ===================================================================
+// Genre Model - Movie and TV Show Genres
+// ===================================================================
+// 
+// Represents genres like Action, Drama, Comedy, Sci-Fi, etc.
+// Uses slug-based approach for cross-source compatibility.
+// ===================================================================
+model Genre {
+  id                  Int      @id @default(autoincrement())
+  
+  // Genre identification
+  slug                String   @unique // URL-friendly slug like "action", "sci-fi"
+  name                String   @unique // Display name like "Action", "Sci-Fi"
+  
+  // Optional external tracking
+  remoteId            String?  // Genre ID from source (e.g., TMDB genre ID)
+  remoteSource        String?  // Source that provided this genre
+  
+  // Relationships
+  content             ContentGenre[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([slug])
+  @@index([name])
+}
+
+// ===================================================================
+// ContentGenre Model - Many-to-Many Content to Genre
+// ===================================================================
+model ContentGenre {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  genre               Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  genreId             Int
+  
+  // Source tracking
+  remoteSource        String   // Source that provided this association
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, genreId])
+  @@index([contentId])
+  @@index([genreId])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Country Model - Production and Origin Countries
+// ===================================================================
+// 
+// Represents countries for production, origin, and release information.
+// Uses ISO 3166-1 country codes for standardization.
+// ===================================================================
+model Country {
+  id                  Int      @id @default(autoincrement())
+  
+  // Country identification
+  code                String   @unique // ISO 3166-1 alpha-2 code like "US", "UK", "FR"
+  name                String   @unique // Display name like "United States", "United Kingdom"
+  
+  // Relationships
+  content             ContentCountry[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([code])
+  @@index([name])
+}
+
+// ===================================================================
+// ContentCountry Model - Many-to-Many Content to Country
+// ===================================================================
+model ContentCountry {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  country             Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  countryId           Int
+  
+  // Country role (production, origin, release, etc.)
+  role                String   @default("production") // 'production', 'origin', 'release'
+  
+  // Source tracking
+  remoteSource        String   // Source that provided this association
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, countryId, role])
+  @@index([contentId])
+  @@index([countryId])
+  @@index([role])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Language Model - Spoken and Subtitle Languages
+// ===================================================================
+// 
+// Represents languages for spoken dialogue, subtitles, and dubbing.
+// Uses ISO 639-1 language codes for standardization.
+// ===================================================================
+model Language {
+  id                  Int      @id @default(autoincrement())
+  
+  // Language identification
+  code                String   @unique // ISO 639-1 code like "en", "es", "fr"
+  name                String   @unique // Display name like "English", "Spanish", "French"
+  nativeName          String?  // Native name like "English", "Español", "Français"
+  
+  // Relationships
+  content             ContentLanguage[]
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([code])
+  @@index([name])
+}
+
+// ===================================================================
+// ContentLanguage Model - Many-to-Many Content to Language
+// ===================================================================
+model ContentLanguage {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  content             Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId           Int
+  language            Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  languageId          Int
+  
+  // Language role (spoken, subtitle, dubbing, etc.)
+  role                String   @default("spoken") // 'spoken', 'subtitle', 'dubbing', 'original'
+  
+  // Source tracking
+  remoteSource        String   // Source that provided this association
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  @@unique([contentId, languageId, role])
+  @@index([contentId])
+  @@index([languageId])
+  @@index([role])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// PersonAlternativeName Model - Alternative Names for People
+// ===================================================================
+// 
+// Stores alternative names, aliases, and stage names for people.
+// Supports different types like birth name, stage name, nickname, etc.
+// ===================================================================
+model PersonAlternativeName {
+  id                  Int      @id @default(autoincrement())
+  
+  // Relationships
+  person              Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId            Int
+  
+  // Name information
+  name                String   // Alternative name
+  type                String   @default("alias") // 'birth_name', 'stage_name', 'nickname', 'alias', 'maiden_name'
+  
+  // Optional language/region specificity
+  languageCode        String?  // ISO 639-1 language code if name is language-specific
+  region              String?  // Region where this name is commonly used
+  
+  // Source tracking
+  remoteSource        String   // Source that provided this alternative name
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  
+  @@unique([personId, name, type])
+  @@index([personId])
+  @@index([name])
+  @@index([type])
+  @@index([remoteSource])
+}
+
+// ===================================================================
+// Request Queue Model - Crawlus Request Queue Implementation
+// ===================================================================
+// 
+// Persistent request queue implementation for Crawlus crawlers.
+// Stores HTTP requests with metadata, status tracking, and retry logic.
+// 
+// Features:
+// - Multiple named queues support
+// - Priority-based processing
+// - Automatic retry with configurable limits
+// - Request deduplication
+// - Comprehensive status tracking
+// - Error message storage
+// ===================================================================
+model RequestQueue {
+  id                      String        @id @default(cuid())
+  
+  // Queue identification
+  queueName               String
+  
+  // Request details
+  url                     String
+  method                  String        @default("GET")
+  headers                 String?       // JSON string
+  payload                 String?       // JSON string
+  userData                String?       // JSON string
+  metadata                String?       // JSON string
+  uniqueKey               String?
+  
+  // Processing control
+  priority                Float         @default(0.5)
+  status                  RequestStatus @default(PENDING)
+  
+  // Retry logic
+  retryCount              Int           @default(0)
+  maxRetries              Int           @default(3)
+  lastError               String?
+  
+  // Timestamps
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  processingStartedAt     DateTime?
+  processingCompletedAt   DateTime?
+  
+  // Constraints and indexes
+  @@unique([queueName, uniqueKey])
+  @@index([queueName, status])
+  @@index([queueName, priority, createdAt])
+  @@index([status])
+  @@index([processingStartedAt])
+}
+
+enum RequestStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  RETRYING
+}
+
+// ===================================================================
+// Unified External IDs Model - Single Table for All External IDs
+// ===================================================================
+// 
+// Unified table to store external IDs for all entity types.
+// Uses polymorphic approach with entityType + entityId pattern.
+// 
+// Features:
+// - Single source of truth for all external mappings
+// - Polymorphic relationships via entityType + entityId
+// - Simplified maintenance and querying
+// - Consistent indexing across all entity types
+// - Easy to extend for new entity types
+// ===================================================================
+model ExternalId {
+  id              Int      @id @default(autoincrement())
+  
+  // External ID information
+  source          String   // 'imdb', 'tmdb', 'csfd', 'wikidata', 'freebase', etc.
+  externalId      String   // The actual ID from external source
+  
+  // Polymorphic entity reference
+  entityType      String   // 'content', 'person', 'collection', 'network', 'company'
+  entityId        Int      // References the ID of the entity
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Constraints and indexes
+  @@unique([source, externalId, entityType, entityId])
+  @@index([source])
+  @@index([externalId])
+  @@index([entityType, entityId])
+  @@index([entityType])
+}

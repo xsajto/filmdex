@@ -1,0 +1,1 @@
+move types/tmdb-api-types.ts into tmdb crawler and rename it to something better.
