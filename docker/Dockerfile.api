@@ -44,6 +44,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/generated ./generated
 
+# Copy entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Create a non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
@@ -55,13 +59,15 @@ RUN mkdir -p /app/data /app/cache && \
 USER nodejs
 
 # Default environment variables
-ENV DATABASE_URL="file:/app/data/movies.db"
 ENV NODE_ENV="production"
 ENV PORT="3000"
 ENV TZ="Europe/Prague"
 
 # Expose API port
 EXPOSE 3000
+
+# Use entrypoint script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # API server command
 CMD ["node", "dist/api/server.js"]

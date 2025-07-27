@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY_URL: registry.sajboch.cz
-  IMAGE_NAME: movies-crawler
+  IMAGE_NAME: filmdex
 
 jobs:
   build:
@@ -85,15 +85,15 @@ jobs:
           # Add your deployment commands here
           # Example with docker run:
           # docker pull ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}
-          # docker stop movies-crawler || true
-          # docker rm movies-crawler || true
+          # docker stop filmdex-crawler || true
+          # docker rm filmdex-crawler || true
           # docker run -d \
-          #   --name movies-crawler \
+          #   --name filmdex-crawler \
           #   --restart unless-stopped \
-          #   -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          #   -e TMDB_API_KEY="${{ secrets.TMDB_API_KEY }}" \
-          #   -v movies-crawler-data:/app/data \
-          #   -v movies-crawler-cache:/app/cache \
+          #   -e DATABASE_URL="file:/app/data/movies.db" \
+          #   -e TMDB_API_KEY="your-tmdb-api-key" \
+          #   -v filmdex-data:/app/data \
+          #   -v filmdex-cache:/app/cache \
           #   ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}
 
       - name: Deploy API Server
@@ -102,12 +102,12 @@ jobs:
           # Add your API deployment commands here
           # Example with docker run:
           # docker pull ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}-api:${{ github.ref_name }}-${{ github.sha }}
-          # docker stop movies-crawler-api || true
-          # docker rm movies-crawler-api || true
+          # docker stop filmdex-api || true
+          # docker rm filmdex-api || true
           # docker run -d \
-          #   --name movies-crawler-api \
+          #   --name filmdex-api \
           #   --restart unless-stopped \
           #   -p 3000:3000 \
-          #   -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          #   -v movies-crawler-data:/app/data \
+          #   -e DATABASE_URL="file:/app/data/movies.db" \
+          #   -v filmdex-data:/app/data \
           #   ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}-api:${{ github.ref_name }}-${{ github.sha }}
