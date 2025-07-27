@@ -26,6 +26,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@crawlus/api": "^0.7.0",
+    "@crawlus/core": "^0.7.0",
+    "@crawlus/utils": "^0.7.0",
     "@prisma/client": "^6.12.0",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.2.0",

@@ -25,21 +25,23 @@ export class TmdbV2Crawler {
             requestQueue: new RequestQueue({ name: 'tmdb', storage: new PrismaRequestQueueStorage('tmdb') }),
             maxConcurrency: 6, // Reduce concurrent requests to respect rate limits
             clearOnStart: false,
+            apiKeys: apiKey.map(key => ({
+                auth: {
+                    type: 'bearer',
+                    apiKey: key,
+                },
+                rateLimiter: {
+                    requestsPerSecond: 49, // Conservative rate per API key
+                    dailyQuota: 24*60*60*49 // TMDB daily quota per API key
+                }
+            })),
+            respectRateLimits: true,
             apiEndpoint: {
                 baseUrl: 'https://api.themoviedb.org',
                 timeout: 30000,
                 autoParseJson: true,
                 autoHandlePagination: false
-            },
-            auth: apiKey.map(key => ({
-                    type: 'bearer',
-                    apiKey: key,
-                    rateLimiter: {
-                        requestsPerSecond: 49, // Conservative rate per API key
-                        dailyQuota: 24*60*60*49 // TMDB daily quota per API key
-                    }
-                })
-            )
+            }
         });
     }
 
