@@ -11,9 +11,9 @@ on:
         required: false
         type: string
       registry_path:
-        description: 'Registry path (e.g., xsajto/filmdex or just filmdex)'
+        description: 'Registry path (e.g., filmdex)'
         required: false
-        default: 'xsajto/filmdex'
+        default: 'filmdex'
         type: string
 
 env:
@@ -54,7 +54,7 @@ jobs:
           if [ -n "${{ inputs.registry_path }}" ]; then
             echo "path=${{ inputs.registry_path }}" >> $GITHUB_OUTPUT
           else
-            echo "path=xsajto/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
+            echo "path=${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push Docker image
