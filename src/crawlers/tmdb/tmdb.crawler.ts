@@ -25,7 +25,7 @@ export class TmdbV2Crawler {
             requestQueue: new RequestQueue({ name: 'tmdb', storage: new PrismaRequestQueueStorage('tmdb') }),
             maxConcurrency: 6, // Reduce concurrent requests to respect rate limits
             clearOnStart: false,
-            credentials: apiKey.map(key => ({
+            apiKeyPool: apiKey.map(key => ({
                 auth: {
                     type: 'bearer',
                     apiKey: key
