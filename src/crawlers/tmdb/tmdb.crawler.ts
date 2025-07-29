@@ -41,7 +41,7 @@ export class TmdbV2Crawler {
                 timeout: 30000,
                 autoParseJson: true,
                 autoHandlePagination: false
-            }
+            },
         });
     }
 
