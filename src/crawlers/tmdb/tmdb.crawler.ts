@@ -33,7 +33,6 @@ export class TmdbV2Crawler {
                     dailyQuota: 24*60*60*49 // TMDB daily quota per API key
                 }
             })),
-            respectRateLimits: true,
             apiEndpoint: {
                 baseUrl: 'https://api.themoviedb.org',
                 timeout: 30000,
