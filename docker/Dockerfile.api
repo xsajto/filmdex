@@ -7,8 +7,9 @@ ARG TARGETPLATFORM=linux/amd64
 
 FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 
-# Install system dependencies and pnpm
-RUN apk add --no-cache sqlite python3 make g++ && \\\n    corepack enable && corepack prepare pnpm@latest --activate
+# Install system dependencies and pnpm  
+RUN apk add --no-cache sqlite python3 make g++ && \
+    corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
@@ -42,8 +43,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
 
-# Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
+# Install production dependencies only (skip prepare script)
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
@@ -77,7 +78,8 @@ ARG ENABLE_SWAGGER=true
 ENV ENABLE_SWAGGER=$ENABLE_SWAGGER
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\\n    CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
 # Expose API port
 EXPOSE 3001
