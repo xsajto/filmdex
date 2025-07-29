@@ -122,15 +122,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-api
     
-    services:
-      sqlite:
-        image: keinos/sqlite3:latest
-        options: >-
-          --health-cmd "sqlite3 --version"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
