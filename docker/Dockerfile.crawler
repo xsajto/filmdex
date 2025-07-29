@@ -27,7 +27,7 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy source code
 COPY src/ ./src/
 COPY prisma/ ./prisma/
-COPY generated/ ./generated/ 2>/dev/null || true
+COPY generated/ ./generated/
 
 # Generate Prisma client
 RUN npx prisma generate
