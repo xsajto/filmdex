@@ -10,7 +10,8 @@ on:
       - 'src/types/**'
       - 'prisma/**'
       - 'package.json'
-      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/crawler.yml'
   pull_request:
     branches:
       - main
@@ -20,7 +21,8 @@ on:
       - 'src/types/**'
       - 'prisma/**'
       - 'package.json'
-      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/crawler.yml'
   workflow_dispatch:
     inputs:
       crawler_mode:
