@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         
         // Get counts for different content types
-        const [totalContent, totalMovies, totalSeries, totalPersons] = await Promise.all([
+        const [, , ,] = await Promise.all([
             prisma.content.count(),
             prisma.content.count({ where: { type: 'movie' } }),
             prisma.content.count({ where: { type: 'series' } }),

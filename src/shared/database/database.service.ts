@@ -312,7 +312,7 @@ export class DatabaseService extends BaseDatabaseService {
                             remoteSource: data.remoteSource
                         }
                     });
-                } catch (updateError) {
+                } catch {
                     // If update also fails, the relationship exists and is fine
                     console.debug(`ContentGenre relationship ${contentId}-${genreId} already exists`);
                 }
