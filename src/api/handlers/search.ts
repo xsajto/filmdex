@@ -180,9 +180,9 @@ router.get('/all', async (req, res) => {
             prisma.content.findMany({
                 where: {
                     OR: [
-                        { title: { contains: searchTerm, mode: 'insensitive' } },
-                        { originalTitle: { contains: searchTerm, mode: 'insensitive' } },
-                        { description: { contains: searchTerm, mode: 'insensitive' } }
+                        { title: { contains: searchTerm } },
+                        { originalTitle: { contains: searchTerm } },
+                        { description: { contains: searchTerm } }
                     ]
                 },
                 select: {
@@ -199,7 +199,7 @@ router.get('/all', async (req, res) => {
             }),
             prisma.person.findMany({
                 where: {
-                    name: { contains: searchTerm, mode: 'insensitive' }
+                    name: { contains: searchTerm }
                 },
                 select: {
                     id: true,

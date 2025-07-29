@@ -36,7 +36,7 @@ on:
 
 env:
   NODE_ENV: production
-  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  DATABASE_URL: file:./test-api.db
   PORT: ${{ inputs.api_port || '3001' }}
 
 jobs:

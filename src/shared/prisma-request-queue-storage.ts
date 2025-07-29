@@ -79,8 +79,7 @@ export class PrismaRequestQueueStorage implements IRequestQueueStorage {
     }));
 
     await this.prisma.requestQueue.createMany({
-      data,
-      skipDuplicates: true
+      data
     });
   }
 

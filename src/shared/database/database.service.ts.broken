@@ -14,7 +14,7 @@ export class DatabaseService extends BaseDatabaseService {
      */
     async createContent(data: Prisma.ContentCreateInput): Promise<{ id: number }> {
         return this.prisma.content.create({
-            data,
+            data
             select: { id: true }
         });
     }
@@ -28,7 +28,7 @@ export class DatabaseService extends BaseDatabaseService {
         update: Prisma.ContentUpdateInput;
     }): Promise<{ id: number }> {
         return this.prisma.content.upsert({
-            ...params,
+            ...params
             select: { id: true }
         });
     }
@@ -38,7 +38,7 @@ export class DatabaseService extends BaseDatabaseService {
      */
     async findContent(where: Prisma.ContentWhereInput): Promise<{ id: number } | null> {
         return this.prisma.content.findFirst({
-            where,
+            where
             select: { id: true }
         });
     }
@@ -48,7 +48,7 @@ export class DatabaseService extends BaseDatabaseService {
      */
     async findUniqueContent(where: Prisma.ContentWhereUniqueInput): Promise<{ id: number } | null> {
         return this.prisma.content.findUnique({
-            where,
+            where
             select: { id: true }
         });
     }
@@ -60,7 +60,7 @@ export class DatabaseService extends BaseDatabaseService {
      */
     async createPerson(data: Prisma.PersonCreateInput): Promise<{ id: number }> {
         return this.prisma.person.create({
-            data,
+            data
             select: { id: true }
         });
     }
@@ -74,7 +74,7 @@ export class DatabaseService extends BaseDatabaseService {
         update: Prisma.PersonUpdateInput;
     }): Promise<{ id: number }> {
         return this.prisma.person.upsert({
-            ...params,
+            ...params
             select: { id: true }
         });
     }
@@ -84,7 +84,7 @@ export class DatabaseService extends BaseDatabaseService {
      */
     async findPerson(where: Prisma.PersonWhereInput): Promise<{ id: number } | null> {
         return this.prisma.person.findFirst({
-            where,
+            where
             select: { id: true }
         });
     }
@@ -126,18 +126,18 @@ export class DatabaseService extends BaseDatabaseService {
             await this.prisma.cast.upsert({
                 where: {
                     contentId_personId_role_character: {
-                        contentId: contentId,
-                        personId: typeof personId === 'string' ? parseInt(personId) : personId,
-                        role: data.role,
+                        contentId: contentId
+                        personId: typeof personId === 'string' ? parseInt(personId) : personId
+                        role: data.role
                         character: data.character || ''
                     }
-                },
-                create: data,
+                }
+                create: data
                 update: {
-                    character: data.character,
-                    department: data.department,
-                    order: data.order,
-                    episodeCount: data.episodeCount,
+                    character: data.character
+                    department: data.department
+                    order: data.order
+                    episodeCount: data.episodeCount
                     remoteSource: data.remoteSource
                 }
             });
@@ -188,6 +188,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createContentRelations(data: Prisma.ContentRelationsCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.contentRelations.createMany({
             data
+            
         });
     }
 
@@ -205,13 +206,13 @@ export class DatabaseService extends BaseDatabaseService {
                 await this.prisma.contentRelations.upsert({
                     where: {
                         sourceContentId_targetContentId_type_remoteSource: {
-                            sourceContentId: sourceContentId,
-                            targetContentId: targetContentId,
-                            type: data.type,
+                            sourceContentId: sourceContentId
+                            targetContentId: targetContentId
+                            type: data.type
                             remoteSource: data.remoteSource
                         }
-                    },
-                    create: data,
+                    }
+                    create: data
                     update: {
                         remoteSource: data.remoteSource
                     }
@@ -267,7 +268,7 @@ export class DatabaseService extends BaseDatabaseService {
         update: Prisma.GenreUpdateInput;
     }): Promise<{ id: number }> {
         return this.prisma.genre.upsert({
-            ...params,
+            ...params
             select: { id: true }
         });
     }
@@ -287,11 +288,11 @@ export class DatabaseService extends BaseDatabaseService {
             await this.prisma.contentGenre.upsert({
                 where: {
                     contentId_genreId: {
-                        contentId: contentId,
+                        contentId: contentId
                         genreId: genreId
                     }
-                },
-                create: data,
+                }
+                create: data
                 update: {
                     remoteSource: data.remoteSource
                 }
@@ -303,9 +304,9 @@ export class DatabaseService extends BaseDatabaseService {
                 try {
                     await this.prisma.contentGenre.updateMany({
                         where: {
-                            contentId: contentId,
+                            contentId: contentId
                             genreId: genreId
-                        },
+                        }
                         data: {
                             remoteSource: data.remoteSource
                         }
@@ -326,6 +327,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createContentGenres(data: Prisma.ContentGenreCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.contentGenre.createMany({
             data
+            
         });
     }
 
@@ -340,7 +342,7 @@ export class DatabaseService extends BaseDatabaseService {
         update: Prisma.CountryUpdateInput;
     }): Promise<{ id: number }> {
         return this.prisma.country.upsert({
-            ...params,
+            ...params
             select: { id: true }
         });
     }
@@ -351,6 +353,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createContentCountries(data: Prisma.ContentCountryCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.contentCountry.createMany({
             data
+            
         });
     }
 
@@ -366,7 +369,7 @@ export class DatabaseService extends BaseDatabaseService {
     }): Promise<{ id: number }> {
         try {
             return await this.prisma.language.upsert({
-                ...params,
+                ...params
                 select: { id: true }
             });
         } catch (error) {
@@ -375,10 +378,10 @@ export class DatabaseService extends BaseDatabaseService {
                 const existing = await this.prisma.language.findFirst({
                     where: { 
                         OR: [
-                            { code: (params.create as any).code },
+                            { code: (params.create as any).code }
                             { name: (params.create as any).name }
                         ]
-                    },
+                    }
                     select: { id: true }
                 });
                 if (existing) {
@@ -395,6 +398,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createContentLanguages(data: Prisma.ContentLanguageCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.contentLanguage.createMany({
             data
+            
         });
     }
 
@@ -409,7 +413,7 @@ export class DatabaseService extends BaseDatabaseService {
         update: Prisma.OrganizationUpdateInput;
     }): Promise<{ id: number }> {
         return this.prisma.organization.upsert({
-            ...params,
+            ...params
             select: { id: true }
         });
     }
@@ -420,6 +424,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createContentOrganizations(data: Prisma.ContentOrganizationCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.contentOrganization.createMany({
             data
+            
         });
     }
 
@@ -443,6 +448,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createKeywordAssociations(data: Prisma.KeywordAssociationCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.keywordAssociation.createMany({
             data
+            
         });
     }
 
@@ -454,6 +460,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createExternalIds(data: Prisma.ExternalIdCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.externalId.createMany({
             data
+            
         });
     }
 
@@ -465,6 +472,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createMedia(data: Prisma.MediaCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.media.createMany({
             data
+            
         });
     }
 
@@ -479,7 +487,7 @@ export class DatabaseService extends BaseDatabaseService {
         update: Prisma.CollectionUpdateInput;
     }): Promise<{ id: number }> {
         return this.prisma.collection.upsert({
-            ...params,
+            ...params
             select: { id: true }
         });
     }
@@ -492,6 +500,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createMetadata(data: Prisma.MetadataCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.metadata.createMany({
             data
+            
         });
     }
 
@@ -514,6 +523,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createTranslations(data: Prisma.TranslationCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.translation.createMany({
             data
+            
         });
     }
 
@@ -545,6 +555,7 @@ export class DatabaseService extends BaseDatabaseService {
     async createReviews(data: Prisma.ReviewCreateManyInput[]): Promise<{ count: number }> {
         return this.prisma.review.createMany({
             data
+            
         });
     }
 
@@ -556,14 +567,14 @@ export class DatabaseService extends BaseDatabaseService {
     async saveGenres(contentId: number, genreData: Prisma.GenreCreateInput[]): Promise<void> {
         for (const genreInput of genreData) {
             const genre = await this.upsertGenre({
-                where: { slug: genreInput.slug },
-                create: genreInput,
+                where: { slug: genreInput.slug }
+                create: genreInput
                 update: { ...genreInput, updatedAt: new Date() }
             });
             
             await this.createContentGenre({
-                content: { connect: { id: contentId } },
-                genre: { connect: { id: genre.id } },
+                content: { connect: { id: contentId } }
+                genre: { connect: { id: genre.id } }
                 remoteSource: 'tmdb'
             });
         }
@@ -575,25 +586,25 @@ export class DatabaseService extends BaseDatabaseService {
     async saveCountries(contentId: number, countryData: Prisma.CountryCreateInput[], type: string): Promise<void> {
         for (const countryInput of countryData) {
             const country = await this.upsertCountry({
-                where: { code: countryInput.code },
-                create: countryInput,
+                where: { code: countryInput.code }
+                create: countryInput
                 update: { ...countryInput, updatedAt: new Date() }
             });
             
             await this.prisma.contentCountry.upsert({
                 where: {
                     contentId_countryId_role: {
-                        contentId: contentId,
-                        countryId: country.id,
+                        contentId: contentId
+                        countryId: country.id
                         role: type
                     }
-                },
+                }
                 create: {
-                    contentId: contentId,
-                    countryId: country.id,
-                    role: type,
+                    contentId: contentId
+                    countryId: country.id
+                    role: type
                     remoteSource: 'tmdb'
-                },
+                }
                 update: {
                     remoteSource: 'tmdb'
                 }
@@ -607,25 +618,25 @@ export class DatabaseService extends BaseDatabaseService {
     async saveLanguages(contentId: number, languageData: Prisma.LanguageCreateInput[], type: string): Promise<void> {
         for (const languageInput of languageData) {
             const language = await this.upsertLanguage({
-                where: { code: languageInput.code },
-                create: languageInput,
+                where: { code: languageInput.code }
+                create: languageInput
                 update: { ...languageInput, updatedAt: new Date() }
             });
             
             await this.prisma.contentLanguage.upsert({
                 where: {
                     contentId_languageId_role: {
-                        contentId: contentId,
-                        languageId: language.id,
+                        contentId: contentId
+                        languageId: language.id
                         role: type
                     }
-                },
+                }
                 create: {
-                    contentId: contentId,
-                    languageId: language.id,
-                    role: type,
+                    contentId: contentId
+                    languageId: language.id
+                    role: type
                     remoteSource: 'tmdb'
-                },
+                }
                 update: {
                     remoteSource: 'tmdb'
                 }
@@ -639,25 +650,25 @@ export class DatabaseService extends BaseDatabaseService {
     async saveOrganizations(contentId: number, organizationData: Prisma.OrganizationCreateInput[], type: string): Promise<void> {
         for (const orgInput of organizationData) {
             const organization = await this.upsertOrganization({
-                where: { name_type_remoteSource: { name: orgInput.name, type: orgInput.type, remoteSource: 'tmdb' } },
-                create: orgInput,
+                where: { name_type_remoteSource: { name: orgInput.name, type: orgInput.type, remoteSource: 'tmdb' } }
+                create: orgInput
                 update: { ...orgInput, updatedAt: new Date() }
             });
             
             await this.prisma.contentOrganization.upsert({
                 where: {
                     contentId_organizationId_role: {
-                        contentId: contentId,
-                        organizationId: organization.id,
+                        contentId: contentId
+                        organizationId: organization.id
                         role: type
                     }
-                },
+                }
                 create: {
-                    contentId: contentId,
-                    organizationId: organization.id,
-                    role: type,
+                    contentId: contentId
+                    organizationId: organization.id
+                    role: type
                     remoteSource: 'tmdb'
-                },
+                }
                 update: {
                     remoteSource: 'tmdb'
                 }
@@ -670,8 +681,8 @@ export class DatabaseService extends BaseDatabaseService {
      */
     async saveCollection(contentId: number, collectionData: Prisma.CollectionCreateInput): Promise<void> {
         await this.upsertCollection({
-            where: { name_remoteSource: { name: collectionData.name, remoteSource: 'tmdb' } },
-            create: collectionData,
+            where: { name_remoteSource: { name: collectionData.name, remoteSource: 'tmdb' } }
+            create: collectionData
             update: { ...collectionData, updatedAt: new Date() }
         });
     }
@@ -682,25 +693,25 @@ export class DatabaseService extends BaseDatabaseService {
     async saveKeywords(contentId: number, keywordData: Prisma.KeywordCreateInput[]): Promise<void> {
         for (const keywordInput of keywordData) {
             const keyword = await this.upsertKeyword({
-                where: { slug: keywordInput.slug },
-                create: keywordInput,
+                where: { slug: keywordInput.slug }
+                create: keywordInput
                 update: { ...keywordInput, updatedAt: new Date() }
             });
             
             await this.prisma.keywordAssociation.upsert({
                 where: {
                     keywordSlug_entityType_entityId: {
-                        keywordSlug: keyword.slug,
-                        entityType: 'Content',
+                        keywordSlug: keyword.slug
+                        entityType: 'Content'
                         entityId: contentId
                     }
-                },
+                }
                 create: {
-                    entityType: 'Content',
-                    entityId: contentId,
-                    keywordSlug: keyword.slug,
+                    entityType: 'Content'
+                    entityId: contentId
+                    keywordSlug: keyword.slug
                     remoteSource: 'tmdb'
-                },
+                }
                 update: {
                     remoteSource: 'tmdb'
                 }
@@ -733,8 +744,8 @@ export class DatabaseService extends BaseDatabaseService {
         // First ensure all persons exist
         for (const personData of creditsData.persons) {
             await this.upsertPerson({
-                where: { remoteId_remoteSource: { remoteId: personData.remoteId, remoteSource: 'tmdb' } },
-                create: personData,
+                where: { remoteId_remoteSource: { remoteId: personData.remoteId, remoteSource: 'tmdb' } }
+                create: personData
                 update: { ...personData, updatedAt: new Date() }
             });
         }
@@ -767,19 +778,19 @@ export class DatabaseService extends BaseDatabaseService {
             }
             
             const reviewCreateManyInput = {
-                remoteId: reviewInput.remoteId,
-                remoteSource: reviewInput.remoteSource,
-                author: reviewInput.author,
-                rating: reviewInput.rating,
-                title: reviewInput.title,
-                content: reviewInput.content,
-                language: reviewInput.language,
-                publishedAt: reviewInput.publishedAt,
-                sourceMetadata: reviewInput.sourceMetadata,
-                sourceUrl: reviewInput.sourceUrl,
-                detailUrl: reviewInput.detailUrl,
-                contentId: contentId,
-                createdAt: reviewInput.createdAt,
+                remoteId: reviewInput.remoteId
+                remoteSource: reviewInput.remoteSource
+                author: reviewInput.author
+                rating: reviewInput.rating
+                title: reviewInput.title
+                content: reviewInput.content
+                language: reviewInput.language
+                publishedAt: reviewInput.publishedAt
+                sourceMetadata: reviewInput.sourceMetadata
+                sourceUrl: reviewInput.sourceUrl
+                detailUrl: reviewInput.detailUrl
+                contentId: contentId
+                createdAt: reviewInput.createdAt
                 updatedAt: reviewInput.updatedAt
             };
             
@@ -800,8 +811,8 @@ export class DatabaseService extends BaseDatabaseService {
             if (languageConnectOrCreate?.connectOrCreate) {
                 const languageData = languageConnectOrCreate.connectOrCreate;
                 const language = await this.upsertLanguage({
-                    where: languageData.where,
-                    create: languageData.create,
+                    where: languageData.where
+                    create: languageData.create
                     update: { ...languageData.create, updatedAt: new Date() }
                 });
                 languageId = language.id;
@@ -816,19 +827,19 @@ export class DatabaseService extends BaseDatabaseService {
             await this.upsertTranslation({
                 where: {
                     translatable_type_translatable_id_field_name_language_id_country_code: {
-                        translatable_type: translationInput.translatable_type,
-                        translatable_id: translationInput.translatable_id,
-                        field_name: translationInput.field_name,
-                        language_id: languageId,
+                        translatable_type: translationInput.translatable_type
+                        translatable_id: translationInput.translatable_id
+                        field_name: translationInput.field_name
+                        language_id: languageId
                         country_code: translationInput.country_code || ''
                     }
-                },
+                }
                 create: {
-                    ...translationInput,
+                    ...translationInput
                     language: { connect: { id: languageId } }
-                },
+                }
                 update: {
-                    translated_value: translationInput.translated_value,
+                    translated_value: translationInput.translated_value
                     updated_at: new Date()
                 }
             });
@@ -843,21 +854,21 @@ export class DatabaseService extends BaseDatabaseService {
             await this.upsertMetadata({
                 where: {
                     metadatable_type_metadatable_id_type_subtype_country_code: {
-                        metadatable_type: metadataInput.metadatable_type,
-                        metadatable_id: metadataInput.metadatable_id,
-                        type: metadataInput.type,
-                        subtype: metadataInput.subtype || '',
+                        metadatable_type: metadataInput.metadatable_type
+                        metadatable_id: metadataInput.metadatable_id
+                        type: metadataInput.type
+                        subtype: metadataInput.subtype || ''
                         country_code: metadataInput.country_code || ''
                     }
-                },
-                create: metadataInput,
+                }
+                create: metadataInput
                 update: {
-                    value: metadataInput.value,
-                    numeric_value: metadataInput.numeric_value,
-                    date_value: metadataInput.date_value,
-                    remote_source: metadataInput.remote_source,
-                    remote_id: metadataInput.remote_id,
-                    source_data: metadataInput.source_data,
+                    value: metadataInput.value
+                    numeric_value: metadataInput.numeric_value
+                    date_value: metadataInput.date_value
+                    remote_source: metadataInput.remote_source
+                    remote_id: metadataInput.remote_id
+                    source_data: metadataInput.source_data
                     updated_at: new Date()
                 }
             });
