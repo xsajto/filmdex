@@ -12,14 +12,16 @@
     "dev:tmdb": "tsx src/crawlers/tmdb/tmdb.crawler.ts",
     "dev:tmdb:resume": "tsx src/scripts/tmdb-resume.ts",
     "start:tmdb": "npm run build && node dist/crawlers/tmdb/tmdb.crawler.js",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "db:studio": "npx prisma studio",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:reset": "npx prisma migrate reset --force && npx prisma db push && npx prisma generate",
     "api:dev": "tsx src/api/server.ts",
-    "api:build": "npm run build && node dist/api/server.js"
+    "api:build": "npm run build && node dist/api/server.js",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -54,11 +56,12 @@
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
+    "@vitest/coverage-v8": "^1.4.0",
     "eslint": "^9.32.0",
-    "jest": "^30.0.5",
+    "husky": "^9.1.7",
     "swagger-typescript-api": "^13.2.7",
-    "ts-jest": "^29.4.0",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^1.4.0"
   }
 }

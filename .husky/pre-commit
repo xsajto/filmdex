@@ -1,0 +1,7 @@
+#\!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run lint fix, build and test before commit
+pnpm run lint:fix
+pnpm run build
+pnpm run test

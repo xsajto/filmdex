@@ -37,7 +37,7 @@ export class TmdbV2Crawler {
                 baseUrl: 'https://api.themoviedb.org',
                 timeout: 30000,
                 autoParseJson: true,
-                autoHandlePagination: false,
+                autoHandlePagination: false
             },
             monitoring: {
                 enabled: true,
