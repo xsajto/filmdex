@@ -79,7 +79,7 @@ const prisma = new PrismaClient();
  *       500:
  *         description: Server error
  */
-router.get('/', async (req, res) => {
+router.get('/stats', async (req, res) => {
     try {
         const [totalMovies, totalSeries, totalSeasons, totalEpisodes, totalPersons, sources, topGenres, recentContent] = await Promise.all([
             prisma.content.count({ where: { type: 'movie' } }),
