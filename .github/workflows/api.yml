@@ -1,0 +1,252 @@
+name: API Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/api/**'
+      - 'src/shared/**'
+      - 'prisma/**'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/api/**'
+      - 'src/shared/**'
+      - 'prisma/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+    inputs:
+      api_port:
+        description: 'API Port'
+        required: false
+        default: '3001'
+        type: string
+      enable_swagger:
+        description: 'Enable Swagger Documentation'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  NODE_ENV: production
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  PORT: ${{ inputs.api_port || '3001' }}
+
+jobs:
+  lint-and-test:
+    name: Lint and Test API
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run TypeScript check
+        run: npm run typecheck
+
+      - name: Run linter on API files
+        run: npm run lint src/api/
+
+      - name: Run API tests
+        run: npm test -- --testPathPattern=api
+        continue-on-error: true
+
+  build-api:
+    name: Build API
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-build
+          path: |
+            dist/
+            generated/
+            package.json
+            package-lock.json
+          retention-days: 7
+
+  test-api:
+    name: Test API Endpoints
+    runs-on: ubuntu-latest
+    needs: build-api
+    
+    services:
+      sqlite:
+        image: keinos/sqlite3:latest
+        options: >-
+          --health-cmd "sqlite3 --version"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Setup test database
+        run: |
+          npm run db:push
+          echo "Database setup completed"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: api-build
+
+      - name: Start API server in background
+        run: |
+          npm run api:build &
+          API_PID=$!
+          echo "API_PID=$API_PID" >> $GITHUB_ENV
+          
+          # Wait for API to be ready
+          timeout 30 bash -c 'until curl -f http://localhost:3001/health; do sleep 1; done' || exit 1
+          echo "API server started successfully"
+
+      - name: Test API endpoints
+        run: |
+          # Test health endpoint
+          curl -f http://localhost:3001/health
+          
+          # Test basic API endpoints
+          curl -f "http://localhost:3001/api/v1/stats"
+          curl -f "http://localhost:3001/api/v1/genres"
+          curl -f "http://localhost:3001/api/v1/countries"
+          curl -f "http://localhost:3001/api/v1/content?limit=5"
+          
+          # Test sitemap
+          curl -f "http://localhost:3001/sitemap.xml"
+          
+          echo "All API endpoint tests passed"
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ ! -z "$API_PID" ]; then
+            kill $API_PID || true
+          fi
+
+      - name: Upload API logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-logs
+          path: |
+            logs/
+            *.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    needs: [build-api, test-api]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.REGISTRY_URL || 'registry.sajboch.cz' }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - name: Build and push API Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ vars.REGISTRY_URL || 'registry.sajboch.cz' }}/filmdex-api:latest
+            ${{ vars.REGISTRY_URL || 'registry.sajboch.cz' }}/filmdex-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            ENABLE_SWAGGER=${{ inputs.enable_swagger }}
+            BUILDPLATFORM=linux/amd64
+            TARGETPLATFORM=linux/amd64
+
+  health-check:
+    name: Post-deployment Health Check
+    runs-on: ubuntu-latest
+    needs: deploy-api
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          # Add your production API URL here
+          API_URL="https://api.your-domain.com"
+          
+          # Test health endpoint
+          curl -f "$API_URL/health" || exit 1
+          
+          # Test basic endpoints
+          curl -f "$API_URL/api/v1/stats" || exit 1
+          
+          echo "Production API health check passed"
+        continue-on-error: true

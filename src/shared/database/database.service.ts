@@ -115,7 +115,7 @@ export class DatabaseService extends BaseDatabaseService {
             } catch (error) {
                 // Handle constraint violations gracefully
                 if ((error as any)?.code === 'P2002') {
-                    console.debug(`Cast relationship already exists, skipping duplicate`);
+                    console.debug('Cast relationship already exists, skipping duplicate');
                 } else {
                     throw error;
                 }
@@ -145,7 +145,7 @@ export class DatabaseService extends BaseDatabaseService {
         } catch (error) {
             // Handle race condition where multiple workers try to create the same cast member
             if ((error as any)?.code === 'P2002') {
-                console.debug(`Cast relationship already exists, skipping duplicate`);
+                console.debug('Cast relationship already exists, skipping duplicate');
             } else {
                 throw error;
             }
@@ -165,7 +165,7 @@ export class DatabaseService extends BaseDatabaseService {
         } catch (error) {
             // Handle race condition where multiple workers try to create the same cast member
             if ((error as any)?.code === 'P2002') {
-                console.debug(`Cast relationship already exists, skipping duplicate`);
+                console.debug('Cast relationship already exists, skipping duplicate');
             } else {
                 throw error;
             }
@@ -541,7 +541,7 @@ export class DatabaseService extends BaseDatabaseService {
         } catch (error) {
             // Handle race condition where multiple workers try to create the same translation
             if ((error as any)?.code === 'P2002') {
-                console.debug(`Translation already exists, skipping duplicate`);
+                console.debug('Translation already exists, skipping duplicate');
             } else {
                 throw error;
             }

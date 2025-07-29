@@ -28,7 +28,7 @@ export class TmdbV2Crawler {
             apiKeys: apiKey.map(key => ({
                 auth: {
                     type: 'bearer',
-                    apiKey: key,
+                    apiKey: key
                 },
                 rateLimiter: {
                     requestsPerSecond: 49, // Conservative rate per API key

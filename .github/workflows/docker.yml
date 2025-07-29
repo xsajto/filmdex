@@ -29,6 +29,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js (for dependency caching)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -62,10 +69,13 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ env.REGISTRY_URL }}/${{ steps.path.outputs.path }}:${{ steps.tag.outputs.tag }}
             ${{ env.REGISTRY_URL }}/${{ steps.path.outputs.path }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            BUILDPLATFORM=linux/amd64
+            TARGETPLATFORM=linux/amd64
