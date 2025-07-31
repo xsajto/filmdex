@@ -24,9 +24,9 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 COPY tsconfig.json ./
 
-# Install dependencies (skip prepare script to avoid husky)
+# Install all dependencies for build phase
 ENV HUSKY=0
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source code
 COPY src/ ./src/
