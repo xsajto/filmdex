@@ -81,8 +81,6 @@ jobs:
           tags: |
             ${{ env.REGISTRY_URL }}/${{ steps.path.outputs.path }}:${{ steps.tag.outputs.tag }}
             ${{ env.REGISTRY_URL }}/${{ steps.path.outputs.path }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           build-args: |
             BUILDPLATFORM=linux/amd64
             TARGETPLATFORM=linux/amd64
