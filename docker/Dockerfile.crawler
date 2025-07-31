@@ -69,6 +69,7 @@ USER crawler
 # Environment variables
 ENV NODE_ENV=production
 ENV DATABASE_URL="file:./data/crawler.db"
+ENV DATABASE_PROVIDER="postgresql"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

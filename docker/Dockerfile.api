@@ -72,6 +72,7 @@ ENV NODE_ENV="production"
 ENV PORT="3001"
 ENV TZ="Europe/Prague"
 ENV DATABASE_URL="file:./data/api.db"
+ENV DATABASE_PROVIDER="postgresql"
 
 # Build args for configuration
 ARG ENABLE_SWAGGER=true
