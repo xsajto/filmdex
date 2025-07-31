@@ -2,9 +2,9 @@ import express from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import { log } from '@crawlus/core';
 
-// Swagger imports - install with: npm install swagger-jsdoc swagger-ui-express @types/swagger-jsdoc @types/swagger-ui-express
-// import swaggerJsdoc from 'swagger-jsdoc';
-// import swaggerUi from 'swagger-ui-express';
+// Swagger imports
+import swaggerJsdoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 
 // Import handlers
 import contentRoutes from './handlers/content';
@@ -37,18 +37,21 @@ const API_PREFIX = '/api/v1';
  *           description: Error message
  */
 
-// Swagger configuration - uncomment when swagger packages are installed
-/*
+// Swagger configuration
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
             title: 'Movies Crawler API',
             version: '1.0.0',
-            description: 'API for movie and TV show data from CSFD and TMDB sources',
+            description: 'Comprehensive API for movie and TV show data from CSFD and TMDB sources. Access detailed information about movies, series, actors, and more.',
             contact: {
                 name: 'API Support',
-                email: 'support@example.com'
+                email: 'support@filmdex.com'
+            },
+            license: {
+                name: 'MIT',
+                url: 'https://opensource.org/licenses/MIT'
             }
         },
         servers: [
@@ -57,11 +60,15 @@ const swaggerOptions = {
                 description: 'Development server'
             },
             {
-                url: 'https://api.movies-crawler.com',
+                url: 'https://api.filmdex.com',
                 description: 'Production server'
             }
         ],
         tags: [
+            {
+                name: 'System',
+                description: 'System health and status endpoints'
+            },
             {
                 name: 'Content',
                 description: 'Operations related to movies, series, seasons, and episodes'
@@ -96,31 +103,30 @@ const swaggerOptions = {
 };
 
 const specs = swaggerJsdoc(swaggerOptions);
+
+// Set up Swagger UI at /doc
+app.use('/doc', swaggerUi.serve, swaggerUi.setup(specs, {
+    explorer: true,
+    customCss: `
+        .swagger-ui .topbar { display: none }
+        .swagger-ui .info { margin: 50px 0; }
+        .swagger-ui .info .title { color: #3b4151; }
+    `,
+    customSiteTitle: 'Filmdex API Documentation',
+    swaggerOptions: {
+        docExpansion: 'list',
+        filter: true,
+        showRequestHeaders: true
+    }
+}));
+
+// Also keep /api-docs for backward compatibility
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
     explorer: true,
     customCss: '.swagger-ui .topbar { display: none }',
     customSiteTitle: 'Movies Crawler API Documentation'
 }));
-*/
 
-// Temporary message for Swagger documentation
-app.get('/api-docs', (req, res) => {
-    res.json({
-        message: 'Swagger documentation will be available here after installing: npm install swagger-jsdoc swagger-ui-express @types/swagger-jsdoc @types/swagger-ui-express',
-        apiDocumentation: {
-            baseUrl: '/api/v1',
-            endpoints: {
-                content: '/api/v1/content',
-                persons: '/api/v1/persons',
-                search: '/api/v1/search',
-                media: '/api/v1/media',
-                metadata: ['/api/v1/genres', '/api/v1/countries', '/api/v1/languages', '/api/v1/collections'],
-                statistics: ['/api/v1/stats', '/api/v1/trending'],
-                export: '/api/v1/export'
-            }
-        }
-    });
-});
 
 /**
  * @swagger
