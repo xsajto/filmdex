@@ -8,8 +8,10 @@ This is a movie data crawler supporting multiple sources: CSFD (Czech film datab
 
 ## Key Architecture
 
-- **Database**: SQLite with Prisma ORM
+- **Database**: PostgreSQL with Prisma ORM (SQLite for local development)
   - Generated client in `generated/prisma/`
+  - **CRITICAL**: Provider is set to "postgresql" - NEVER change this to any other provider
+  - Production deployments use PostgreSQL exclusively
   - Comprehensive schema with Content, Person, Cast, Crew, Video, Gallery, Award, etc.
   - Supports hierarchical relationships (series/seasons/episodes via parent/child)
   - Multi-source support via `remoteSource` field
@@ -73,7 +75,8 @@ npm run test:coverage    # Run tests with coverage
 - **Environment Variables**: 
   - `CSFD_EMAIL` and `CSFD_PASSWORD` for CSFD authentication
   - `TMDB_API_KEY` for TMDB API authentication
-  - `DATABASE_URL` for database connection (defaults to SQLite)
+  - `DATABASE_URL` for database connection (PostgreSQL connection string in production)
+  - `DATABASE_PROVIDER` is set to "postgresql" in Docker containers
 
 - **Rate Limiting**: 
   - CSFD: Uses maxConcurrency: 1 to avoid blocking
@@ -84,6 +87,7 @@ npm run test:coverage    # Run tests with coverage
 
 ## Database Schema Notes
 
+- **IMPORTANT**: The Prisma schema provider is set to "postgresql" and must NEVER be changed
 - **Content Model**: Unified model for movies, series, seasons, and episodes
 - **Person Model**: Separate model for actors, directors, writers, etc.
 - **Cast/Crew Models**: Proper relationship models linking Content and Person
@@ -91,6 +95,7 @@ npm run test:coverage    # Run tests with coverage
 - **Multi-source Support**: `remoteId` + `remoteSource` creates unique identifiers
 - **Rich Metadata**: Enhanced fields for ratings, popularity, release dates, etc.
 - **Cross-referencing**: ContentMapping for linking same content across sources
+- **Database Provider**: PostgreSQL is the only supported provider in production
 
 ## Shared Services
 
