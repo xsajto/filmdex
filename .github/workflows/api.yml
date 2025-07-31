@@ -89,5 +89,5 @@ jobs:
             registry.sajboch.cz/filmdex/api:latest
             registry.sajboch.cz/filmdex/api:${{ steps.date.outputs.tag }}
             registry.sajboch.cz/filmdex/api:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=registry.sajboch.cz/filmdex/api:buildcache
+          cache-to: type=registry,ref=registry.sajboch.cz/filmdex/api:buildcache,mode=max
