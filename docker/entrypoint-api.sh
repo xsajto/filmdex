@@ -32,6 +32,26 @@ if ! check_env_var "DATABASE_URL"; then
 fi
 
 echo "🚀 All environment variables validated successfully!"
+
+# Check database connectivity before starting API
+echo "🔄 Verifying database connection..."
+
+# Try a simple database connection test
+if echo "SELECT 1;" | npx prisma db execute --stdin >/dev/null 2>&1; then
+    echo "✅ Database connection verified"
+else
+    echo "❌ Cannot connect to database"
+    echo "💡 API requires database connectivity to function"
+    echo ""
+    echo "Please ensure:"
+    echo "   - Database server is running and accessible"
+    echo "   - DATABASE_URL is correct: ${DATABASE_URL%:*@*}@${DATABASE_URL##*@}"
+    echo "   - Database user has proper permissions"
+    echo "   - Crawler has completed database initialization"
+    echo ""
+    exit 1
+fi
+
 echo "📍 Starting application: $@"
 
 # Execute the original command
