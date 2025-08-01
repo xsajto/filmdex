@@ -46,6 +46,24 @@ echo "🚀 All environment variables validated successfully!"
 # Run database migrations before starting the application
 echo "🔄 Preparing database..."
 
+# Check basic connectivity first
+echo "🔄 Testing database connectivity..."
+
+# Extract connection details from DATABASE_URL
+DB_HOST=$(echo "$DATABASE_URL" | sed -n 's/.*@\([^:]*\):.*/\1/p')
+DB_PORT=$(echo "$DATABASE_URL" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+
+# Test PostgreSQL connectivity using nc (netcat) first
+if command -v nc >/dev/null 2>&1; then
+    if ! nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; then
+        echo "❌ Cannot reach database server at $DB_HOST:$DB_PORT"
+        echo "💡 Database server appears to be down or unreachable"
+        echo "Connection details: ${DATABASE_URL%:*@*}@${DATABASE_URL##*@}"
+        exit 1
+    fi
+    echo "✅ Database server is reachable"
+fi
+
 # Try to run migrations - if they fail, try to initialize the database
 echo "🔄 Running database migrations..."
 
