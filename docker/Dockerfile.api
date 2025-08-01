@@ -8,7 +8,7 @@ ARG TARGETPLATFORM=linux/amd64
 FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 
 # Install system dependencies and pnpm  
-RUN apk add --no-cache sqlite python3 make g++ && \
+RUN apk add --no-cache postgresql-client python3 make g++ && \
     corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
@@ -35,7 +35,7 @@ FROM --platform=$TARGETPLATFORM node:20-alpine
 
 # Install pnpm and timezone data
 RUN corepack enable && corepack prepare pnpm@latest --activate && \
-    apk add --no-cache tzdata
+    apk add --no-cache tzdata postgresql-client
 
 WORKDIR /app
 
@@ -71,7 +71,7 @@ USER nodejs
 ENV NODE_ENV="production"
 ENV PORT="3001"
 ENV TZ="Europe/Prague"
-ENV DATABASE_URL="file:./data/api.db"
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/filmdex"
 ENV DATABASE_PROVIDER="postgresql"
 
 # Build args for configuration

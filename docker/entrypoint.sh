@@ -43,11 +43,29 @@ fi
 # DATABASE_URL is always required
 echo "${YELLOW}🗄️  Validating database environment...${NC}"
 if ! check_env_var "DATABASE_URL"; then
-    echo "${RED}💡 DATABASE_URL is required. Example: 'file:/app/data/movies.db' for SQLite${NC}"
+    echo "${RED}💡 DATABASE_URL is required. Example: 'postgresql://user:pass@host:5432/dbname' for PostgreSQL${NC}"
     exit 1
 fi
 
 echo "${GREEN}🚀 All environment variables validated successfully!${NC}"
+
+# Run database migrations before starting the application
+echo "${YELLOW}🔄 Running database migrations...${NC}"
+if pnpm prisma migrate deploy; then
+    echo "${GREEN}✅ Database migrations completed successfully${NC}"
+else
+    echo "${RED}❌ Database migrations failed${NC}"
+    echo "${YELLOW}💡 This might be the first run - trying to push schema instead...${NC}"
+    
+    # Try to push schema if migrations fail (for first-time setup)
+    if pnpm prisma db push --accept-data-loss; then
+        echo "${GREEN}✅ Database schema pushed successfully${NC}"
+    else
+        echo "${RED}❌ Database setup failed completely${NC}"
+        exit 1
+    fi
+fi
+
 echo "${GREEN}📍 Starting application: $@${NC}"
 
 # Execute the original command
