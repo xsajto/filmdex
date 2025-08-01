@@ -1,12 +1,6 @@
 #!/bin/sh
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-echo "${GREEN}🎬 Starting Filmdex Movie Crawler...${NC}"
+echo "🎬 Starting Filmdex Movie Crawler..."
 
 # Function to check required environment variable
 check_env_var() {
@@ -14,103 +8,103 @@ check_env_var() {
     local var_value=$(eval echo \$$var_name)
     
     if [ -z "$var_value" ]; then
-        echo "${RED}❌ ERROR: Required environment variable '$var_name' is not set${NC}"
+        echo "❌ ERROR: Required environment variable '$var_name' is not set"
         return 1
     else
-        echo "${GREEN}✅ $var_name is configured${NC}"
+        echo "✅ $var_name is configured"
         return 0
     fi
 }
 
 # Check if this is TMDB crawler (needs TMDB_API_KEY)
 if echo "$@" | grep -q "tmdb"; then
-    echo "${YELLOW}🔍 Validating TMDB crawler environment...${NC}"
+    echo "🔍 Validating TMDB crawler environment..."
     
     if ! check_env_var "TMDB_API_KEY"; then
-        echo "${RED}💡 TMDB_API_KEY is required for TMDB crawler. Get it from: https://www.themoviedb.org/settings/api${NC}"
+        echo "💡 TMDB_API_KEY is required for TMDB crawler. Get it from: https://www.themoviedb.org/settings/api"
         exit 1
     fi
 fi
 
 # Check if this is API server (might need additional vars)
 if echo "$@" | grep -q "api/server"; then
-    echo "${YELLOW}🌐 Validating API server environment...${NC}"
+    echo "🌐 Validating API server environment..."
     
     # API server might need specific environment variables
     # Add checks here if needed
 fi
 
 # DATABASE_URL is always required
-echo "${YELLOW}🗄️  Validating database environment...${NC}"
+echo "🗄️  Validating database environment..."
 if ! check_env_var "DATABASE_URL"; then
-    echo "${RED}💡 DATABASE_URL is required. Example: 'postgresql://user:pass@host:5432/dbname' for PostgreSQL${NC}"
+    echo "💡 DATABASE_URL is required. Example: 'postgresql://user:pass@host:5432/dbname' for PostgreSQL"
     exit 1
 fi
 
-echo "${GREEN}🚀 All environment variables validated successfully!${NC}"
+echo "🚀 All environment variables validated successfully!"
 
 # Run database migrations before starting the application
-echo "${YELLOW}🔄 Checking database connection...${NC}"
+echo "🔄 Checking database connection..."
 
 # First, check if we can connect to the database at all
 if ! npx prisma db execute --stdin <<< "SELECT 1;" >/dev/null 2>&1; then
-    echo "${RED}❌ Cannot connect to database${NC}"
-    echo "${YELLOW}💡 Please ensure your database is running and DATABASE_URL is correct${NC}"
+    echo "❌ Cannot connect to database"
+    echo "💡 Please ensure your database is running and DATABASE_URL is correct"
     exit 1
 fi
 
-echo "${GREEN}✅ Database connection successful${NC}"
+echo "✅ Database connection successful"
 
 # Check if the database has the migrations table
-echo "${YELLOW}🔍 Checking if database schema exists...${NC}"
+echo "🔍 Checking if database schema exists..."
 if npx prisma db execute --stdin <<< "SELECT 1 FROM _prisma_migrations LIMIT 1;" >/dev/null 2>&1; then
     # Database exists and has migration history - use normal migration
-    echo "${YELLOW}🔄 Running database migrations...${NC}"
+    echo "🔄 Running database migrations..."
     if npx prisma migrate deploy; then
-        echo "${GREEN}✅ Database migrations completed successfully${NC}"
+        echo "✅ Database migrations completed successfully"
     else
-        echo "${RED}❌ Database migrations failed${NC}"
-        echo "${RED}Please check your migration files and database state${NC}"
+        echo "❌ Database migrations failed"
+        echo "Please check your migration files and database state"
         exit 1
     fi
 else
     # No migration table found - check if ANY tables exist
-    echo "${YELLOW}🔍 Checking if database is empty...${NC}"
+    echo "🔍 Checking if database is empty..."
     
     # This query works for PostgreSQL to check if any user tables exist
     TABLE_COUNT=$(npx prisma db execute --stdin <<< "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
     
     if [ -z "$TABLE_COUNT" ] || [ "$TABLE_COUNT" = "0" ]; then
-        echo "${YELLOW}⚠️  Database is empty - initializing schema...${NC}"
-        echo "${YELLOW}This appears to be a fresh database installation${NC}"
+        echo "⚠️  Database is empty - initializing schema..."
+        echo "This appears to be a fresh database installation"
         
         # Only push schema if database is completely empty
         if npx prisma db push --skip-generate; then
-            echo "${GREEN}✅ Database schema initialized successfully${NC}"
+            echo "✅ Database schema initialized successfully"
             
             # Now create initial migration to establish migration history
-            echo "${YELLOW}📝 Creating initial migration record...${NC}"
+            echo "📝 Creating initial migration record..."
             if npx prisma migrate deploy; then
-                echo "${GREEN}✅ Migration history established${NC}"
+                echo "✅ Migration history established"
             else
-                echo "${YELLOW}⚠️  Could not establish migration history, but schema is ready${NC}"
+                echo "⚠️  Could not establish migration history, but schema is ready"
             fi
         else
-            echo "${RED}❌ Failed to initialize database schema${NC}"
+            echo "❌ Failed to initialize database schema"
             exit 1
         fi
     else
-        echo "${RED}❌ Database has tables but no migration history!${NC}"
-        echo "${RED}This is a dangerous state - manual intervention required${NC}"
-        echo "${YELLOW}Options:${NC}"
-        echo "${YELLOW}1. If this is a legacy database, create a baseline migration${NC}"
-        echo "${YELLOW}2. If this is corrupted, consider backing up and resetting${NC}"
-        echo "${YELLOW}3. Contact your database administrator${NC}"
+        echo "❌ Database has tables but no migration history!"
+        echo "This is a dangerous state - manual intervention required"
+        echo "Options:"
+        echo "1. If this is a legacy database, create a baseline migration"
+        echo "2. If this is corrupted, consider backing up and resetting"
+        echo "3. Contact your database administrator"
         exit 1
     fi
 fi
 
-echo "${GREEN}📍 Starting application: $@${NC}"
+echo "📍 Starting application: $@"
 
 # Execute the original command
 exec "$@"
