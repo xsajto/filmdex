@@ -47,7 +47,7 @@ echo "🚀 All environment variables validated successfully!"
 echo "🔄 Checking database connection..."
 
 # First, check if we can connect to the database at all
-if ! npx prisma db execute --stdin <<< "SELECT 1;" >/dev/null 2>&1; then
+if ! echo "SELECT 1;" | npx prisma db execute --stdin >/dev/null 2>&1; then
     echo "❌ Cannot connect to database"
     echo "💡 Please ensure your database is running and DATABASE_URL is correct"
     exit 1
@@ -57,7 +57,7 @@ echo "✅ Database connection successful"
 
 # Check if the database has the migrations table
 echo "🔍 Checking if database schema exists..."
-if npx prisma db execute --stdin <<< "SELECT 1 FROM _prisma_migrations LIMIT 1;" >/dev/null 2>&1; then
+if echo "SELECT 1 FROM _prisma_migrations LIMIT 1;" | npx prisma db execute --stdin >/dev/null 2>&1; then
     # Database exists and has migration history - use normal migration
     echo "🔄 Running database migrations..."
     if npx prisma migrate deploy; then
@@ -72,7 +72,7 @@ else
     echo "🔍 Checking if database is empty..."
     
     # This query works for PostgreSQL to check if any user tables exist
-    TABLE_COUNT=$(npx prisma db execute --stdin <<< "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+    TABLE_COUNT=$(echo "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';" | npx prisma db execute --stdin 2>/dev/null | grep -o '[0-9]\+' | head -1)
     
     if [ -z "$TABLE_COUNT" ] || [ "$TABLE_COUNT" = "0" ]; then
         echo "⚠️  Database is empty - initializing schema..."
