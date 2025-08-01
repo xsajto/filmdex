@@ -99,10 +99,18 @@ const swaggerOptions = {
             }
         ]
     },
-    apis: ['./src/api/handlers/*.ts', './src/api/server.ts']
+    // In production, scan the compiled JS files; in dev, scan TypeScript
+    apis: process.env.NODE_ENV === 'production' 
+        ? ['./dist/api/handlers/*.js', './dist/api/server.js']
+        : ['./src/api/handlers/*.ts', './src/api/server.ts']
 };
 
 const specs = swaggerJsdoc(swaggerOptions);
+
+// Debug: Log swagger spec generation
+log.info(`Swagger specs generated. Environment: ${process.env.NODE_ENV}`);
+log.info(`Scanning paths: ${swaggerOptions.apis.join(', ')}`);
+log.info(`Found ${Object.keys((specs as any).paths || {}).length} API paths`);
 
 // Set up Swagger UI at /doc
 app.use('/doc', swaggerUi.serve, swaggerUi.setup(specs, {

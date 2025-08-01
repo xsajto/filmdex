@@ -12,7 +12,8 @@
     "declaration": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "removeComments": false
   },
   "include": [
     "src/**/*.ts"
