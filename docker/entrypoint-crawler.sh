@@ -52,6 +52,7 @@ if npx prisma migrate deploy 2>/dev/null; then
     echo "✅ Database migrations completed successfully"
 else
     echo "⚠️  Migrations failed - checking database state..."
+    echo "Database URL: ${DATABASE_URL}"
     
     # Try to push schema if this is a fresh database
     echo "🔄 Attempting to initialize database schema..."
@@ -71,7 +72,7 @@ else
         echo "   - Database server is running and accessible"
         echo "   - Database user has proper permissions"
         echo ""
-        echo "Current DATABASE_URL: ${DATABASE_URL%@*}@***"
+        echo "Current DATABASE_URL: ${DATABASE_URL}"
         exit 1
     fi
 fi
