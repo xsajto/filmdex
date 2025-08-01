@@ -56,8 +56,8 @@ COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/package*.json ./
 COPY --from=base /app/prisma ./prisma
 
-# Copy entrypoint script
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+# Copy crawler entrypoint script
+COPY docker/entrypoint-crawler.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Create non-root user

@@ -10,7 +10,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'docker/Dockerfile.crawler'
-      - 'docker/entrypoint.sh'
+      - 'docker/entrypoint-crawler.sh'
       - '.github/workflows/crawler.yml'
   pull_request:
     branches: [main]
@@ -21,7 +21,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'docker/Dockerfile.crawler'
-      - 'docker/entrypoint.sh'
+      - 'docker/entrypoint-crawler.sh'
       - '.github/workflows/crawler.yml'
   workflow_dispatch:
 

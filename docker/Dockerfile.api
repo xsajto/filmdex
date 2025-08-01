@@ -53,8 +53,8 @@ COPY --from=builder /app/generated ./generated
 # Generate Prisma client in production stage
 RUN pnpm prisma generate
 
-# Copy entrypoint script
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+# Copy API entrypoint script
+COPY docker/entrypoint-api.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Create a non-root user
