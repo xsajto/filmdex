@@ -51,14 +51,14 @@ echo "${GREEN}🚀 All environment variables validated successfully!${NC}"
 
 # Run database migrations before starting the application
 echo "${YELLOW}🔄 Running database migrations...${NC}"
-if pnpm prisma migrate deploy; then
+if npx prisma migrate deploy; then
     echo "${GREEN}✅ Database migrations completed successfully${NC}"
 else
     echo "${RED}❌ Database migrations failed${NC}"
     echo "${YELLOW}💡 This might be the first run - trying to push schema instead...${NC}"
     
     # Try to push schema if migrations fail (for first-time setup)
-    if pnpm prisma db push --accept-data-loss; then
+    if npx prisma db push --accept-data-loss; then
         echo "${GREEN}✅ Database schema pushed successfully${NC}"
     else
         echo "${RED}❌ Database setup failed completely${NC}"
