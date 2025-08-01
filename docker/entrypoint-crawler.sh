@@ -48,15 +48,28 @@ echo "🔄 Preparing database..."
 
 # Try to run migrations - if they fail, try to initialize the database
 echo "🔄 Running database migrations..."
-if npx prisma migrate deploy 2>/dev/null; then
+
+# Capture migration output for better error reporting
+MIGRATION_OUTPUT=$(npx prisma migrate deploy 2>&1)
+MIGRATION_EXIT_CODE=$?
+
+if [ $MIGRATION_EXIT_CODE -eq 0 ]; then
     echo "✅ Database migrations completed successfully"
 else
     echo "⚠️  Migrations failed - checking database state..."
-    echo "Database URL: ${DATABASE_URL}"
+    echo "Migration error output:"
+    echo "$MIGRATION_OUTPUT"
+    echo ""
+    echo "Database connection: ${DATABASE_URL%:*@*}@${DATABASE_URL##*@}"
     
     # Try to push schema if this is a fresh database
     echo "🔄 Attempting to initialize database schema..."
-    if npx prisma db push --skip-generate 2>&1 | grep -q "success"; then
+    
+    # Capture schema push output
+    SCHEMA_OUTPUT=$(npx prisma db push --skip-generate 2>&1)
+    SCHEMA_EXIT_CODE=$?
+    
+    if [ $SCHEMA_EXIT_CODE -eq 0 ]; then
         echo "✅ Database schema initialized successfully"
         
         # Try migrations again after schema push
@@ -67,12 +80,15 @@ else
         fi
     else
         echo "❌ Could not initialize database"
+        echo "Schema push error output:"
+        echo "$SCHEMA_OUTPUT"
+        echo ""
         echo "💡 Please check:"
-        echo "   - DATABASE_URL is correct"
         echo "   - Database server is running and accessible"
         echo "   - Database user has proper permissions"
+        echo "   - Database '${DATABASE_URL##*/}' exists"
         echo ""
-        echo "Current DATABASE_URL: ${DATABASE_URL}"
+        echo "Connection details: ${DATABASE_URL%:*@*}@${DATABASE_URL##*@}"
         exit 1
     fi
 fi
