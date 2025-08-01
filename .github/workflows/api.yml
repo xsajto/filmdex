@@ -10,6 +10,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'docker/Dockerfile.api'
+      - 'docker/entrypoint.sh'
       - '.github/workflows/api.yml'
   pull_request:
     branches: [main]
@@ -20,6 +21,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'docker/Dockerfile.api'
+      - 'docker/entrypoint.sh'
       - '.github/workflows/api.yml'
   workflow_dispatch:
 
