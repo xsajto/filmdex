@@ -5,11 +5,14 @@ import { handleError } from '../utils';
 const router: Router = Router();
 const prisma = new PrismaClient();
 
+// Constants for sitemap limits
+const MAX_URLS_PER_SITEMAP = 20000;
+
 /**
  * @swagger
  * /sitemap.xml:
  *   get:
- *     summary: Generate sitemap of sitemaps with full content endpoints
+ *     summary: Generate sitemap index with paginated content sitemaps
  *     tags: [Sitemap]
  *     produces:
  *       - application/xml
@@ -28,46 +31,24 @@ router.get('/', async (req, res) => {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         
         // Get counts for different content types
-        const [, , ,] = await Promise.all([
+        const [totalContent, movieCount, seriesCount, personCount] = await Promise.all([
             prisma.content.count(),
             prisma.content.count({ where: { type: 'movie' } }),
             prisma.content.count({ where: { type: 'series' } }),
             prisma.person.count()
         ]);
 
-        // Create sitemap index with individual sitemaps
-        const sitemapIndex = `<?xml version="1.0" encoding="UTF-8"?>
+        // Calculate number of sitemaps needed for each type
+        const contentPages = Math.ceil(totalContent / MAX_URLS_PER_SITEMAP);
+        const moviePages = Math.ceil(movieCount / MAX_URLS_PER_SITEMAP);
+        const seriesPages = Math.ceil(seriesCount / MAX_URLS_PER_SITEMAP);
+        const personPages = Math.ceil(personCount / MAX_URLS_PER_SITEMAP);
+
+        let sitemapIndex = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <!-- API Documentation -->
     <sitemap>
-        <loc>${baseUrl}/api-docs</loc>
-        <lastmod>${new Date().toISOString()}</lastmod>
-    </sitemap>
-    
-    <!-- Content Sitemaps -->
-    <sitemap>
-        <loc>${baseUrl}/sitemap/content.xml</loc>
-        <lastmod>${new Date().toISOString()}</lastmod>
-    </sitemap>
-    
-    <sitemap>
-        <loc>${baseUrl}/sitemap/movies.xml</loc>
-        <lastmod>${new Date().toISOString()}</lastmod>
-    </sitemap>
-    
-    <sitemap>
-        <loc>${baseUrl}/sitemap/series.xml</loc>
-        <lastmod>${new Date().toISOString()}</lastmod>
-    </sitemap>
-    
-    <sitemap>
-        <loc>${baseUrl}/sitemap/persons.xml</loc>
-        <lastmod>${new Date().toISOString()}</lastmod>
-    </sitemap>
-    
-    <!-- Full Data Endpoints -->
-    <sitemap>
-        <loc>${baseUrl}/sitemap/full-content.xml</loc>
+        <loc>${baseUrl}/doc</loc>
         <lastmod>${new Date().toISOString()}</lastmod>
     </sitemap>
     
@@ -75,7 +56,45 @@ router.get('/', async (req, res) => {
     <sitemap>
         <loc>${baseUrl}/sitemap/stats.xml</loc>
         <lastmod>${new Date().toISOString()}</lastmod>
-    </sitemap>
+    </sitemap>`;
+
+        // Add content sitemaps (paginated)
+        for (let page = 1; page <= contentPages; page++) {
+            sitemapIndex += `
+    <sitemap>
+        <loc>${baseUrl}/sitemap/content-${page}.xml</loc>
+        <lastmod>${new Date().toISOString()}</lastmod>
+    </sitemap>`;
+        }
+
+        // Add movie sitemaps (paginated)
+        for (let page = 1; page <= moviePages; page++) {
+            sitemapIndex += `
+    <sitemap>
+        <loc>${baseUrl}/sitemap/movies-${page}.xml</loc>
+        <lastmod>${new Date().toISOString()}</lastmod>
+    </sitemap>`;
+        }
+
+        // Add series sitemaps (paginated)
+        for (let page = 1; page <= seriesPages; page++) {
+            sitemapIndex += `
+    <sitemap>
+        <loc>${baseUrl}/sitemap/series-${page}.xml</loc>
+        <lastmod>${new Date().toISOString()}</lastmod>
+    </sitemap>`;
+        }
+
+        // Add person sitemaps (paginated)
+        for (let page = 1; page <= personPages; page++) {
+            sitemapIndex += `
+    <sitemap>
+        <loc>${baseUrl}/sitemap/persons-${page}.xml</loc>
+        <lastmod>${new Date().toISOString()}</lastmod>
+    </sitemap>`;
+        }
+
+        sitemapIndex += `
 </sitemapindex>`;
 
         res.set('Content-Type', 'application/xml');
@@ -86,11 +105,13 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Generate sitemap for all content with full nested data endpoints
+ * Generate paginated sitemap for all content with full nested data endpoints
  */
-router.get('/content.xml', async (req, res) => {
+router.get('/content-:page.xml', async (req, res) => {
     try {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const page = parseInt(req.params.page) || 1;
+        const skip = (page - 1) * MAX_URLS_PER_SITEMAP;
         
         const content = await prisma.content.findMany({
             select: {
@@ -98,8 +119,9 @@ router.get('/content.xml', async (req, res) => {
                 type: true,
                 updatedAt: true
             },
-            orderBy: { updatedAt: 'desc' },
-            take: 50000 // Limit for sitemap
+            orderBy: { id: 'asc' }, // Use consistent ordering
+            skip: skip,
+            take: MAX_URLS_PER_SITEMAP
         });
 
         let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -108,10 +130,16 @@ router.get('/content.xml', async (req, res) => {
         content.forEach(item => {
             sitemap += `
     <url>
-        <loc>${baseUrl}/api/v1/content/${item.id}/full</loc>
+        <loc>${baseUrl}/api/v1/content/${item.id}</loc>
         <lastmod>${item.updatedAt.toISOString()}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/api/v1/content/${item.id}/full</loc>
+        <lastmod>${item.updatedAt.toISOString()}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
     </url>`;
         });
 
@@ -126,11 +154,13 @@ router.get('/content.xml', async (req, res) => {
 });
 
 /**
- * Generate sitemap for movies with full data
+ * Generate paginated sitemap for movies with full data
  */
-router.get('/movies.xml', async (req, res) => {
+router.get('/movies-:page.xml', async (req, res) => {
     try {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const page = parseInt(req.params.page) || 1;
+        const skip = (page - 1) * MAX_URLS_PER_SITEMAP;
         
         const movies = await prisma.content.findMany({
             where: { type: 'movie' },
@@ -138,8 +168,9 @@ router.get('/movies.xml', async (req, res) => {
                 id: true,
                 updatedAt: true
             },
-            orderBy: { updatedAt: 'desc' },
-            take: 50000
+            orderBy: { id: 'asc' },
+            skip: skip,
+            take: MAX_URLS_PER_SITEMAP
         });
 
         let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -148,10 +179,22 @@ router.get('/movies.xml', async (req, res) => {
         movies.forEach(movie => {
             sitemap += `
     <url>
-        <loc>${baseUrl}/api/v1/content/${movie.id}/full</loc>
+        <loc>${baseUrl}/api/v1/content/${movie.id}</loc>
         <lastmod>${movie.updatedAt.toISOString()}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.9</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/api/v1/content/${movie.id}/full</loc>
+        <lastmod>${movie.updatedAt.toISOString()}</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/api/v1/content/${movie.id}/complete</loc>
+        <lastmod>${movie.updatedAt.toISOString()}</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
     </url>`;
         });
 
@@ -166,11 +209,13 @@ router.get('/movies.xml', async (req, res) => {
 });
 
 /**
- * Generate sitemap for TV series with full data
+ * Generate paginated sitemap for TV series with full data
  */
-router.get('/series.xml', async (req, res) => {
+router.get('/series-:page.xml', async (req, res) => {
     try {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const page = parseInt(req.params.page) || 1;
+        const skip = (page - 1) * MAX_URLS_PER_SITEMAP;
         
         const series = await prisma.content.findMany({
             where: { type: 'series' },
@@ -178,8 +223,9 @@ router.get('/series.xml', async (req, res) => {
                 id: true,
                 updatedAt: true
             },
-            orderBy: { updatedAt: 'desc' },
-            take: 50000
+            orderBy: { id: 'asc' },
+            skip: skip,
+            take: MAX_URLS_PER_SITEMAP
         });
 
         let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -188,10 +234,22 @@ router.get('/series.xml', async (req, res) => {
         series.forEach(show => {
             sitemap += `
     <url>
-        <loc>${baseUrl}/api/v1/content/${show.id}/full</loc>
+        <loc>${baseUrl}/api/v1/content/${show.id}</loc>
         <lastmod>${show.updatedAt.toISOString()}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/api/v1/content/${show.id}/hierarchy</loc>
+        <lastmod>${show.updatedAt.toISOString()}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/api/v1/content/${show.id}/full</loc>
+        <lastmod>${show.updatedAt.toISOString()}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
     </url>`;
         });
 
@@ -206,19 +264,22 @@ router.get('/series.xml', async (req, res) => {
 });
 
 /**
- * Generate sitemap for persons with full data
+ * Generate paginated sitemap for persons with full data
  */
-router.get('/persons.xml', async (req, res) => {
+router.get('/persons-:page.xml', async (req, res) => {
     try {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const page = parseInt(req.params.page) || 1;
+        const skip = (page - 1) * MAX_URLS_PER_SITEMAP;
         
         const persons = await prisma.person.findMany({
             select: {
                 id: true,
                 updatedAt: true
             },
-            orderBy: { updatedAt: 'desc' },
-            take: 50000
+            orderBy: { id: 'asc' },
+            skip: skip,
+            take: MAX_URLS_PER_SITEMAP
         });
 
         let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -227,7 +288,7 @@ router.get('/persons.xml', async (req, res) => {
         persons.forEach(person => {
             sitemap += `
     <url>
-        <loc>${baseUrl}/api/v1/persons/${person.id}/full</loc>
+        <loc>${baseUrl}/api/v1/persons/${person.id}</loc>
         <lastmod>${person.updatedAt.toISOString()}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.7</priority>
@@ -244,50 +305,6 @@ router.get('/persons.xml', async (req, res) => {
     }
 });
 
-/**
- * Generate sitemap for full content data endpoints
- */
-router.get('/full-content.xml', async (req, res) => {
-    try {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        
-        const content = await prisma.content.findMany({
-            select: {
-                id: true,
-                type: true,
-                updatedAt: true,
-                rating: true
-            },
-            where: {
-                rating: { gte: 7.0 } // Only high-rated content for full data
-            },
-            orderBy: { rating: 'desc' },
-            take: 10000
-        });
-
-        let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
-
-        content.forEach(item => {
-            const priority = item.rating ? Math.min(1.0, (item.rating / 10)) : 0.5;
-            sitemap += `
-    <url>
-        <loc>${baseUrl}/api/v1/content/${item.id}/complete</loc>
-        <lastmod>${item.updatedAt.toISOString()}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>${priority.toFixed(1)}</priority>
-    </url>`;
-        });
-
-        sitemap += `
-</urlset>`;
-
-        res.set('Content-Type', 'application/xml');
-        res.send(sitemap);
-    } catch (err) {
-        handleError(res, err, 'Failed to generate full content sitemap');
-    }
-});
 
 /**
  * Generate sitemap for statistics and metadata endpoints
